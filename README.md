@@ -1,7 +1,8 @@
 # artist-lyric-gen
 A research project in conditional lyric generation conditioned on artists
 
-Another paper to read: Wizards of Wikipedia
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 
 ## Prerequisites
 
@@ -13,5 +14,8 @@ This project uses conda to manage packages and requirements - however pip can al
 
 See setup.sh to get started and install requirements for the project
 
-## Standards
-For formatting, we use black to autoformat files, and flake8 to provide linting
+## TODO
+
+ - [ ] Fill in Boilerplate code
+ - [ ] Get Genius api token and try it out
+ - [ ] Scope out future work for project
