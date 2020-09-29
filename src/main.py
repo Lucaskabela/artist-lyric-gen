@@ -29,7 +29,7 @@ def _parse_args():
         )
     """
     parser = argparse.ArgumentParser(
-        description='Arguments for Experience Replay project'
+        description='Arguments for Lyric Generation project',
     )
 
     args = parser.parse_args()
