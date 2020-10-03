@@ -5,17 +5,18 @@ PURPOSE: This file defines the code for training the neural networks in pytorch
 """
 
 from .models import save_model, load_model
+from os import path
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
+import torch.nn as nn
 import torch.utils.tensorboard as tb
-import torchvision.transforms.functional as TF
 
 
 def train(args):
-    from os import path
-
-    model = None  # Planner()
+    """
+    trains a model as specified by args
+    """
+    model = None  # LSTM() or whatever - should be specified in args
     train_logger, valid_logger = None, None
     if args.log_dir is not None:
         train_logger = tb.SummaryWriter(path.join(args.log_dir, "train"))
@@ -29,41 +30,54 @@ def train(args):
     model = model.to(device)
     if args.continue_training:
         model = load_model(model)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
-    train_data = load_data("drive_data")
-    loss = torch.L1Loss()
+    # TODO: set up load_data functions - be best if return a data loader
+    train_data = None  # load_data()
+    valid_data = None  # load_data()
+
+    # TODO: Change the ignore_index to padding index
+    loss = nn.CrossEntropyLoss(ignore_index=-1)
+
     global_step = 0
     for epoch in range(args.num_epoch):
 
         model.train()
         losses = []
-        for img, label in train_data:
-            img, label = img.to(device), label.to(device)
+        for x, y in train_data:
+            x, y = x.to(device), y.to(device)
 
-            pred = model(img)
-            loss_val = loss(pred, label)
-
-            if train_logger is not None:
-                train_logger.add_scalar("loss", loss_val, global_step)
-                if global_step % 100 == 0:
-                    fig, ax = plt.subplots(1, 1)
-                    ax.imshow(TF.to_pil_image(img[0].cpu()))
-                    ax.add_artist(plt.Circle(label[0], 2, ec="g", fill=False, lw=1.5))
-                    ax.add_artist(plt.Circle(pred[0], 2, ec="r", fill=False, lw=1.5))
-                    train_logger.add_figure("viz", fig, global_step)
-                    del ax, fig
+            # TODO: Add teacher forcing - need to pass actual
+            pred = model(x)
+            loss_val = loss(pred, y)
 
             optimizer.zero_grad()
-            loss_val.backward()
+            loss.backward()
+            if args.grad_clip > 0.0:
+                nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
             optimizer.step()
             global_step += 1
 
             losses.append(loss_val.detach().cpu().numpy())
+            if train_logger is not None:
+                train_logger.add_scalar("loss", losses[-1], global_step)
 
-        avg_loss = np.mean(losses)
-        if train_logger is None:
-            print("epoch %-3d \t loss = %0.3f" % (epoch, avg_loss))
+        model.eval()
+        eval_metrics = []
+        for x, y in valid_data:
+            x, y = x.to(device), y.to(device)
+            pred = model(x)
+            # Compute whatever metrics here
+            eval_metrics.append(0)
+
+        avg_eval_metric = np.mean(eval_metrics)
+        if valid_logger is not None:
+            valid_logger.add_scalar("eval", avg_eval_metric, global_step)
+
+        f1 = avg_eval_metric
+        avg_l = np.mean(losses)
+        print("epoch %-3d \t loss = %0.3f \t f1 = %.3f" % (epoch, avg_l, f1))
         save_model(model)
 
     save_model(model)
