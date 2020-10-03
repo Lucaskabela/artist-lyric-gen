@@ -40,7 +40,8 @@ def _parse_args():
     parser.add_argument("-n", "--num_epoch", type=int, default=50)
     parser.add_argument("-lr", "--learning_rate", type=float, default=1e-3)
     parser.add_argument("-c", "--continue_training", action="store_true")
-    parser.add_argument("--batch_size", type=int, default=2, help="batch size")
+    parser.add_argument("-b", "--batch_size", type=int, default=2)
+    parser.add_argument("-gc", "--grad_clip", type=float, default=0.0)
 
     args = parser.parse_args()
     return args
