@@ -130,3 +130,5 @@ dmypy.json
 
 # Code editors
 .vscode/*
+
+*.DS_STORE
