@@ -2,15 +2,14 @@ import argparse
 import json
 from dataset_utils import loop_and_process
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--name", type=str, help="Name of an artist")
-parser.add_argument("--path", type=str, help="Path to the artist json file")
-args = parser.parse_args()
-
 raw_songs_dir = 'raw_songs'
 raw_songs_file_prefix = 'Raw_Song'
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--name", type=str, help="Name of an artist")
+    parser.add_argument("--path", type=str, help="Path to the artist json file")
+    args = parser.parse_args()
     with open(args.path) as jsonfile:
         artist = json.load(jsonfile)
         songs = artist["songs"]
