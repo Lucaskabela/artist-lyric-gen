@@ -9,14 +9,13 @@ genius = lyricsgenius.Genius(GENIUS_ACCESS_TOKEN)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", type=str, help="Name of an artist")
-parser.add_argument("--id", type=int, help="Id of the artist")
+parser.add_argument("--csv", type=str, help="csv file with all artists to get")
 args = parser.parse_args()
 
 if __name__ == "__main__":
-
     def process_artist(row):
         _, row = row
-        artist = genius.search_artist(row["Artist"], artist_id=row["Id"])
+        artist = genius.search_artist(row["Artist"])
         artist.save_lyrics()
         return {"artist": row["Artist"], "num_songs": artist.num_songs}
 
@@ -24,23 +23,20 @@ if __name__ == "__main__":
         _, row = row
         return row["Artist"]
 
-    if args.name is None:
-        print("\n Getting lyrics for all artists")
-        artists = pd.read_csv("artists.csv")
-        #   print('Artist {} out of {}'.format(index, len(artists)))
-        #   start = time.time()
-        #   artist = genius.search_artist(row["Artist"], artist_id=row["Id"])
-        #   print("Num songs {}".format(len(artist['songs'])))
-        #   artist.save_lyrics()
-        #   print("Lyrics saved")
-        #   print("--- %s seconds ---" % (time.time() - start))
+    artists = pd.DataFrame([], columns=['Artist'])
+    if args.csv is not None:
+        print("\n Getting lyrics for all artists in {}".format(args.csv))
+        artists = pd.read_csv(args.csv)
+    elif args.name is not None:
+        print("\n Getting lyrics for {}".format(args.name))
+        artists = pd.DataFrame([args.name], columns=['Artist'])
     else:
-        row = (None, {"Artist": args.name, "Id": args.id})
-        loop_and_process(
-            artists.iterrows(),
-            process_artist,
-            "Artist",
-            get_artist_name,
-            "Artists_Scraped",
-        )
-        # for index, row in artists.iterrows():
+        print("No Input Artists")
+    loop_and_process(
+        artists.iterrows(),
+        process_artist,
+        "Artist",
+        get_artist_name,
+        "Artists_Scraped",
+    )
+
