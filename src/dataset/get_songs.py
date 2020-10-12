@@ -2,41 +2,41 @@ import argparse
 import lyricsgenius
 import pandas as pd
 import time
-from dataset_utils import loop_and_process
+from dataset_utils import loop_and_process, name_to_file_name
 from genius import GENIUS_ACCESS_TOKEN
 
 genius = lyricsgenius.Genius(GENIUS_ACCESS_TOKEN)
+genius.excluded_terms = ["Remix", "Live", "Intro", "Outro", "Freestyle", "Demo", "Interlude", "Snippet"]
+artist_lyric_dir = 'raw_artist_lyrics'
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--name", type=str, help="Name of an artist")
-parser.add_argument("--csv", type=str, help="csv file with all artists to get")
-args = parser.parse_args()
+def get_songs(name=None, csv=None):
+    def process_artist(name):
+        artist = genius.search_artist(name)
+        artist.save_lyrics("{}/{}.json".format(artist_lyric_dir, name_to_file_name(name)))
+        return None
 
-if __name__ == "__main__":
-    def process_artist(row):
-        _, row = row
-        artist = genius.search_artist(row["Artist"])
-        artist.save_lyrics()
-        return {"artist": row["Artist"], "num_songs": artist.num_songs}
-
-    def get_artist_name(row):
-        _, row = row
-        return row["Artist"]
+    def get_artist_name(name):
+        return name
 
     artists = pd.DataFrame([], columns=['Artist'])
-    if args.csv is not None:
-        print("\n Getting lyrics for all artists in {}".format(args.csv))
-        artists = pd.read_csv(args.csv)
-    elif args.name is not None:
-        print("\n Getting lyrics for {}".format(args.name))
-        artists = pd.DataFrame([args.name], columns=['Artist'])
+    if csv is not None:
+        print("\n Getting lyrics for all artists in {}".format(csv))
+        with open(csv) as openfile:
+            artists = openfile.readlines()
+        artists = [artist.strip() for artist in artists]
+    elif name is not None:
+        print("\n Getting lyrics for {}".format(name))
+        artists = pd.DataFrame([name], columns=['Artist'])
     else:
         print("No Input Artists")
     loop_and_process(
-        artists.iterrows(),
+        artists,
         process_artist,
         "Artist",
         get_artist_name,
-        "Artists_Scraped",
+        artist_lyric_dir,
     )
+
+if __name__ == "__main__":
+    get_songs(csv='get_artists.csv')
 
