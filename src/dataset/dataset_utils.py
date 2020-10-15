@@ -13,27 +13,28 @@ def loop_and_process(
     i = 1
     print("{} total {}".format(len(objects), item_type_name))
     start = time.time()
-    for o in tqdm(objects):
+    os = tqdm(objects)
+    for o in os:
         obj_name = get_obj_name_fn(o)
         obj_file_name = name_to_file_name(obj_name)
         try:
-            tqdm.write(
+            os.set_description(
                 "Starting {} {} out of {}: {}".format(
                     item_type_name, i, len(objects), obj_name
                 )
             )
             processed_obj = process_fn(o)
-            tqdm.write("Finished Processing {}".format(obj_name))
+            os.set_description("Finished Processing {}".format(obj_name))
             if processed_obj is not None:
                 with open(
                     "{}/{}{}.json".format(data_dir, data_file_name_prefix, obj_file_name), "w"
                 ) as outfile:
                     json.dump(processed_obj, outfile)
-                    tqdm.write("Wrote out data for {} to {}".format(obj_name, outfile.name))
+                    os.set_description("Wrote out data for {} to {}".format(obj_name, outfile.name))
             with open("{}/{}LIST".format(data_dir,data_file_name_prefix), "a") as outfile:
                 outfile.write("{}\n".format(obj_name))
-                tqdm.write("Wrote out {} to the list {}".format(obj_name, outfile.name))
-            tqdm.write("Finished {}".format(obj_name))
+                os.set_description("Wrote out {} to the list {}".format(obj_name, outfile.name))
+            os.set_description("Finished {}".format(obj_name))
         except Exception as e:
             print("Failed to process {}".format(obj_name))
             with open("{}/{}FAILED".format(data_dir,data_file_name_prefix), "a") as outfile:
@@ -42,3 +43,13 @@ def loop_and_process(
         i = i + 1
     time_taken = str(datetime.timedelta(seconds=time.time() - start))
     print("{} for {} {}".format(time_taken, len(objects), item_type_name))
+
+def read_list_from_file(list_path):
+    with open(list_path) as listfile:
+        l = listfile.readlines()
+    return [i.strip() for i in l]
+
+def write_list_to_file(l, list_path, mode):
+    with open(list_path, mode) as outfile:
+        for i in l:
+            outfile.write("{}\n".format(i))
