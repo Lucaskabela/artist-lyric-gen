@@ -1,16 +1,16 @@
 import argparse
 import json
 from dataset_utils import loop_and_process, name_to_file_name
-from artist_to_raw_song_files import raw_songs_dir, raw_songs_file_prefix
+from artist_to_raw_song_files import raw_songs_dir
 
 verse_split_songs_dir = "raw_verse_songs"
-verse_split_songs_prefix = "raw_verse_song"
 
-def raw_songs_to_verse_split_songs(song_list_path, dir_prefix, file_prefix):
+def raw_songs_to_verse_split_songs(song_list_path, dir_prefix):
     with open(song_list_path) as listfile:
         song_list = listfile.readlines()
+    song_list = [song.strip() for song in song_list]
     def process_song(song):
-        with open("{}/{}_{}.json".format(raw_songs_dir, raw_songs_file_prefix, name_to_file_name(song.strip()))) as song_file:
+        with open("{}/{}.json".format(raw_songs_dir, name_to_file_name(song))) as song_file:
             song = json.load(song_file)
         verses = []
         lyrics = song['lyrics']
@@ -39,8 +39,8 @@ def raw_songs_to_verse_split_songs(song_list_path, dir_prefix, file_prefix):
             'verses': verses,
         }
     def get_song_name(song):
-        return song.strip()
-    loop_and_process(song_list, process_song, "Song", get_song_name, "{}/{}".format(dir_prefix, file_prefix))
+        return song
+    loop_and_process(song_list, process_song, "Song", get_song_name, dir_prefix)
 
 if __name__ == "__main__":
-    raw_songs_to_verse_split_songs('raw_songs/Raw_Song__LIST', verse_split_songs_dir, verse_split_songs_prefix)
+    raw_songs_to_verse_split_songs('raw_songs/LIST', verse_split_songs_dir)
