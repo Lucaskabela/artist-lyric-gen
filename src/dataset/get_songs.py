@@ -5,14 +5,26 @@ import time
 from dataset_utils import loop_and_process, name_to_file_name
 from genius import GENIUS_ACCESS_TOKEN
 
+raw_songs_dir = 'raw_songs'
+artist_song_split_token = ' | '
+
 genius = lyricsgenius.Genius(GENIUS_ACCESS_TOKEN)
 genius.excluded_terms = ["Remix", "Live", "Intro", "Outro", "Freestyle", "Demo", "Interlude", "Snippet"]
 artist_lyric_dir = 'raw_artist_lyrics'
 
 def get_songs(name=None, csv=None):
     def process_artist(name):
-        artist = genius.search_artist(name)
-        artist.save_lyrics("{}/{}.json".format(artist_lyric_dir, name_to_file_name(name)))
+        artist = genius.search_artist(name, max_songs=3)
+        songs = artist.songs
+        def process_song(song):
+            return {
+                'title': song.title,
+                'artist': song.artist,
+                'lyrics': song.lyrics
+            }
+        def get_song_name(song):
+            return song.artist + artist_song_split_token + song.title
+        loop_and_process(songs, process_song, "Song", get_song_name, raw_songs_dir)
         return None
 
     def get_artist_name(name):
