@@ -16,6 +16,11 @@ See setup.sh to get started and install requirements for the project
 
 ## TODO
 
- - [ ] Fill in Boilerplate code
- - [ ] Get Genius api token and try it out
- - [ ] Scope out future work for project
+ - [ x ] Fill in Boilerplate code
+ - [ x ] Get Genius api token and try it out
+ - [ x ] Scope out future work for project
+ - [ ] Collect data from Genius
+ - [ ] Write BART baseline
+ - [ ] Write GhostWriter LSTM baselin (?)
+ - [ ] Implement CVAE
+ - [ ] Evaluation Code
