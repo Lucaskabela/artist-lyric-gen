@@ -1,3 +1,8 @@
+# Dataset files - specific to this project
+src/dataset/raw_songs
+src/dataset/raw_artist_lyrics
+src/dataset/raw_verse_songs
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
