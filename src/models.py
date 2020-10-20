@@ -100,4 +100,4 @@ class CVAE(BaseNetwork):
     def forward(self, x, c):
         mu, log_var = self.encode(x, c)
         z = self.reparameterize(mu, log_var)
-        return self.decode(z, c)
+        return self.decode(z, c), mu, log_var
