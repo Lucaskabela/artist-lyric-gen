@@ -1,7 +1,7 @@
 import argparse
 import json
 from dataset_utils import loop_and_process, name_to_file_name
-from artist_to_raw_song_files import raw_songs_dir
+from get_songs import raw_songs_dir
 
 verse_split_songs_dir = "raw_verse_songs"
 
@@ -22,7 +22,7 @@ def raw_songs_to_verse_split_songs(song_list_path, dir_prefix):
             if lyrics[i] == '[':
                 # we reached a new verse
                 # append the previous verse if there was one
-                if len(verse_metadata) > 0 and len(verse_lyrics) > 0:
+                if len(verse_metadata) > 0 and len(verse_lyrics.strip()) > 0 and "produce" not in verse_metadata.lower():
                     verses.append({'metadata': verse_metadata, 'lyrics': verse_lyrics})
                 # reset for the new verse
                 verse_lyrics = ''
@@ -37,6 +37,8 @@ def raw_songs_to_verse_split_songs(song_list_path, dir_prefix):
         return {
             'title': song['title'],
             'verses': verses,
+            'artist': song['artist'],
+            'featured_artists': song['featured_artists']
         }
     def get_song_name(song):
         return song
