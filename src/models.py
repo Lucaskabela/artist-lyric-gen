@@ -63,12 +63,41 @@ class GhostLSTM(BaseNetwork):
 class CVAE(BaseNetwork):
     def __init__(self, vocab_size, embedding_dim, hidden_size, name="cvae"):
 
-        super().__init__()
+        super(CVAE, self).__init__()
         self.vocab_size = vocab_size
         self.name = name
 
         self.embedding = nn.Embedding(self.vocab_size, embedding_dim)
         nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
-        # TODO: add args for
+
         self.encoder = nn.LSTM(embedding_dim, hidden_size)
         self.decoder = nn.LSTM(hidden_size, self.vocab_size)
+
+    def encode(self, x, c):  # Produce Q(z | x, c)
+        """
+        x: (batch_size, seq_len, embedding_dim)
+        c: (batch_size, class_size (?))
+        """
+        # Cat x, c and encode
+        mu, log_var = 0
+        return mu, log_var
+
+    def reparameterize(self, mu, log_var):
+        """
+        Apply reparameterization for derivatives -> use rsample()?
+        """
+        std = torch.exp(0.5 * log_var)
+        eps = torch.randn_like(std)
+        return mu + eps * std
+
+    def decode(self, z, c):  # Produce P(x | z, c)
+        """
+        z: (batch_size, latent_size (?))
+        c: (batch_size, class_size (?))
+        """
+        return 0
+
+    def forward(self, x, c):
+        mu, log_var = self.encode(x, c)
+        z = self.reparameterize(mu, log_var)
+        return self.decode(z, c)
