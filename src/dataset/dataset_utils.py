@@ -19,13 +19,13 @@ def loop_and_process(
         obj_name = get_obj_name_fn(o)
         obj_file_name = name_to_file_name(obj_name)
         try:
-            os.set_description(
-                "Starting {} {} out of {}: {}".format(
-                    item_type_name, i, len(objects), obj_name
-                )
-            )
+            # # os.set_description(
+            #     "Starting {} {} out of {}: {}".format(
+            #         item_type_name, i, len(objects), obj_name
+            #     )
+            # )
             processed_obj = process_fn(o)
-            os.set_description("Finished Processing {}".format(obj_name))
+            # os.set_description("Finished Processing {}".format(obj_name))
             # None means skip writing data to its own file, false means do not add to list
             if processed_obj is not None and processed_obj is not False:
                 # write to own file
@@ -33,18 +33,18 @@ def loop_and_process(
                     "{}/{}{}.json".format(data_dir, data_file_name_prefix, obj_file_name), "w"
                 ) as outfile:
                     json.dump(processed_obj, outfile)
-                    os.set_description("Wrote out data for {} to {}".format(obj_name, outfile.name))
+                    # os.set_description("Wrote out data for {} to {}".format(obj_name, outfile.name))
             if processed_obj is not False:
                 # add to the list
                 with open("{}/{}LIST".format(data_dir,data_file_name_prefix), "a") as outfile:
                     outfile.write("{}\n".format(obj_name))
-                    os.set_description("Wrote out {} to the list {}".format(obj_name, outfile.name))
+                    # os.set_description("Wrote out {} to the list {}".format(obj_name, outfile.name))
             else:
                 # removed from list
                 with open("{}/{}REMOVED".format(data_dir,data_file_name_prefix), "a") as outfile:
                     outfile.write("{}\n".format(obj_name))
-                    os.set_description("Wrote out {} to the removed list {}".format(obj_name, outfile.name))
-            os.set_description("Finished {}".format(obj_name))
+                    # os.set_description("Wrote out {} to the removed list {}".format(obj_name, outfile.name))
+            # os.set_description("Finished {}".format(obj_name))
         except Exception as e:
             tqdm.write("Failed to process {}".format(obj_name))
             with open("{}/{}FAILED".format(data_dir,data_file_name_prefix), "a") as outfile:
@@ -64,3 +64,10 @@ def write_list_to_file(l, list_path, mode):
     with open(list_path, mode) as outfile:
         for i in l:
             outfile.write("{}\n".format(i))
+
+def remove_duplicates_from_list_file(dir_name, file_name):
+    print('Removing duplicates from list {}/{}'.format(dir_name, file_name))
+    l = read_list_from_file('{}/{}'.format(dir_name, file_name))
+    s = set(l)
+    write_list_to_file(s, '{}/{}'.format(dir_name, file_name), 'w')
+    print('Done removing duplicates')
