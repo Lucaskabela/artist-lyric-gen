@@ -69,19 +69,21 @@ def train(args):
     model = model.to(device)
 
     # TODO: Change the ignore_index to padding index
-    loss = nn.CrossEntropyLoss(ignore_index=-1)
+    loss = nn.CrossEntropyLoss(ignore_index=0)
 
     global_step = 0
     for epoch in range(args.num_epoch):
 
         model.train()
         losses = []
-        for x, y in train_data:
-            x, y = x.to(device), y.to(device)
-
+        for x in train_data:
+            # Now we need to make sure everything in the batch has same size
+            x = nn.utils.rnn.pad_sequence(x, padding_value=0)
+            x = x.to(device)
+            print(x.shape)
             # TODO: Add teacher forcing - need to pass actual
-            pred = model(x)
-            loss_val = loss(pred, y)
+            pred = model(x, None)
+            loss_val = loss(pred, x)
 
             optimizer.zero_grad()
             loss.backward()

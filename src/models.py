@@ -143,7 +143,7 @@ class CVAE(BaseNetwork):
         z = self.reparameterize(mu, log_var)
 
         # Teacher forcing here
-        SOS = 0  # Decided SOS will be token 0
+        SOS = torch.ones(x.shape[0], 1, 1).long().to(self.device())
         initial = self.decode(SOS, z, c)
         out_sequence = [initial]
         for token in x:
