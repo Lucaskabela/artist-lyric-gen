@@ -5,6 +5,7 @@ PURPOSE: This file defines the driving functions for the expirements/code
         of the project and contains the argparser
 """
 import argparse
+from train import train
 
 
 def _parse_args():
@@ -34,12 +35,11 @@ def _parse_args():
     # Model related arguments here
 
     # Training related arguments here
+    parser.add_argument("--rand_seed", type=int, default=1)
     parser.add_argument(
         "--data", type=str, default="./data/wikitext2", help="Dir of dataset"
     )
-    parser.add_argument(
-        "--log_dir", type=str, default=None, help="Dir of logs for tb"
-    )
+    parser.add_argument("--log_dir", type=str, default=None, help="Dir of tb")
     parser.add_argument("-n", "--num_epoch", type=int, default=50)
     parser.add_argument("-lr", "--learning_rate", type=float, default=1e-3)
     parser.add_argument("-c", "--continue_training", action="store_true")
@@ -51,7 +51,8 @@ def _parse_args():
 
 
 def main():
-    return None
+    args = _parse_args()
+    train(args)
 
 
 if __name__ == "__main__":

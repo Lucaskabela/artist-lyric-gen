@@ -25,26 +25,34 @@ def cvae_loss_function(x_p, x, mu, log_var, alpha=0):
     return BCE + alpha * KLD
 
 
-def train(args):
-    """
-    trains a model as specified by args
-    """
-    model = models.CVAE()  # LSTM() or whatever - should be specified in args
-    train_logger, valid_logger = None, None
-    if args.log_dir is not None:
-        train_logger = tb.SummaryWriter(path.join(args.log_dir, "train"))
-        valid_logger = tb.SummaryWriter(path.join(args.log_dir, "valid"))
+def seed_random(rand_seed):
+    torch.manual_seed(rand_seed)
+    np.random.seed(rand_seed)
 
+
+def init_device():
     if torch.cuda.is_available():
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
+    return device
 
-    if args.continue_training:
-        model.load_model()
-    model = model.to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+def init_logger(log_dir=None):
+    train_logger, valid_logger = None, None
+    if log_dir is not None:
+        train_logger = tb.SummaryWriter(path.join(log_dir, "train"))
+        valid_logger = tb.SummaryWriter(path.join(log_dir, "valid"))
+    return train_logger, valid_logger
+
+
+def train(args):
+    """
+    trains a model as specified by args
+    """
+    seed_random(args.rand_seed)
+    device = init_device()
+    train_log, valid_log = init_logger(log_dir=args.log_dir)
 
     # TODO: set up load_data functions - be best if return a data loader
     corpus = utils.Corpus(args.data)
@@ -54,6 +62,12 @@ def train(args):
     valid_data = utils.load_data(corpus.valid)
 
     vocab = len(corpus.dictionary)
+    model = models.CVAE(vocab, 300, 500, 100)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+    if args.continue_training:
+        model.load_model()
+    model = model.to(device)
+
     # TODO: Change the ignore_index to padding index
     loss = nn.CrossEntropyLoss(ignore_index=-1)
 
@@ -77,8 +91,8 @@ def train(args):
             global_step += 1
 
             losses.append(loss_val.detach().cpu().numpy())
-            if train_logger is not None:
-                train_logger.add_scalar("loss", losses[-1], global_step)
+            if train_log is not None:
+                train_log.add_scalar("loss", losses[-1], global_step)
 
         model.eval()
         eval_metrics = []
@@ -89,8 +103,8 @@ def train(args):
             eval_metrics.append(0)
 
         avg_eval_metric = np.mean(eval_metrics)
-        if valid_logger is not None:
-            valid_logger.add_scalar("eval", avg_eval_metric, global_step)
+        if valid_log is not None:
+            valid_log.add_scalar("eval", avg_eval_metric, global_step)
 
         f1 = avg_eval_metric
         avg_l = np.mean(losses)
