@@ -67,12 +67,19 @@ class CVAE(BaseNetwork):
     """
 
     def __init__(
-        self, vocab_size, emb_dim, hidden_size, latent_dim, drop=0.1, name="cvae"
+        self,
+        vocab,
+        emb_dim,
+        hidden_size,
+        latent_dim,
+        drop=0.1,
+        name="cvae",
     ):
 
         super(CVAE, self).__init__()
-        self.vocab_size = vocab_size
+        self.vocab_size = vocab
         self.emb_dim = emb_dim
+        self.hidden_size = hidden_size
         self.name = name
 
         self.embedding = nn.Embedding(self.vocab_size, emb_dim)
