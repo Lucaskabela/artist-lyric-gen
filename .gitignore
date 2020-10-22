@@ -130,3 +130,6 @@ dmypy.json
 
 # Code editors
 .vscode/*
+
+# Secrets
+secrets.txt
