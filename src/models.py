@@ -94,21 +94,23 @@ class CVAE(BaseNetwork):
 
         # Make this latent + hidden (?)
         self.decoder_embedding = nn.Embedding(self.vocab_size, latent_dim)
-        self.decoder = nn.LSTM(latent_dim, hidden_size)
-        self.out = nn.Linear(hidden_size, self.vocab_size)
+        self.decoder = nn.LSTM(latent_dim, latent_dim)
+        self.out = nn.Linear(latent_dim, self.vocab_size)
 
     def encode(self, x, c):  # Produce Q(z | x, c)
         """
-        x: (seq_len, batch_size, embedding_dim)
+        x: (seq_len, batch_size)
         c: (batch_size, class_size (?))
         """
         # Cat x, c and encode
         # Embed x, c
 
         # c_h, (c_hn, c_cn) = self.c_encoder(c)
+
+        # Turn x to (seq_len, batch_size, emb_dim)
         x = self.dropout(self.embedding(x))
         x_h, (x_hn, x_cn) = self.x_encoder(x)
-        x_enc = torch.cat([x_hn[0], x_hn[1]])
+        x_enc = torch.cat([x_hn[0], x_hn[1]], dim=-1)
         # c_enc = torch.cat([c_hn[0], c_hn[1]])
         # hidden_in = torch.cat([x_enc, c_enc], dim=-1)
         hidden_in = x_enc
@@ -135,18 +137,21 @@ class CVAE(BaseNetwork):
         embedded_prev = self.dropout(embedded_prev)
 
         output, hidden = self.decoder(embedded_prev, to_decode)
-        output = F.softmax(self.out(output[0]))
+        output = F.softmax(self.out(output[0]), dim=-1)
         return output, hidden
 
     def forward(self, x, c):
         mu, log_var = self.encode(x, c)
         z = self.reparameterize(mu, log_var)
+        z = (z.unsqueeze(0), z.unsqueeze(0))
 
         # Teacher forcing here
-        SOS = torch.ones(x.shape[0], 1, 1).long().to(self.device())
-        initial = self.decode(SOS, z, c)
+        SOS = torch.ones(1, x.shape[1]).long().to(self.device())
+        initial, hidden = self.decode(SOS, z, c)
+        z = hidden
         out_sequence = [initial]
         for token in x:
+            token = token.unsqueeze(0)
             token_t, hidden = self.decode(token, z, c)
             out_sequence.append(token_t)
             z = hidden

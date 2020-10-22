@@ -57,9 +57,9 @@ def train(args):
     # TODO: set up load_data functions - be best if return a data loader
     corpus = utils.Corpus(args.data)
     # This should return a dataloader or something to that effect
-    train_data = utils.load_data(corpus.train)
+    train_data = utils.load_data(corpus.train, batch_size=args.batch_size)
     # This should return a dataloader or something to that effect
-    valid_data = utils.load_data(corpus.valid)
+    valid_data = utils.load_data(corpus.valid, batch_size=args.batch_size)
 
     vocab = len(corpus.dictionary)
     model = models.CVAE(vocab, 300, 500, 100)
@@ -77,16 +77,21 @@ def train(args):
         model.train()
         losses = []
         for x in train_data:
+            break
             # Now we need to make sure everything in the batch has same size
-            x = nn.utils.rnn.pad_sequence(x, padding_value=0)
-            x = x.to(device)
-            print(x.shape)
+            x = nn.utils.rnn.pad_sequence(x, padding_value=0).to(device)
+
             # TODO: Add teacher forcing - need to pass actual
-            pred = model(x, None)
-            loss_val = loss(pred, x)
+            pred, mu, log_var = model(x, None)
+            eos_tensor = torch.empty(1, x.shape[1]).to(device)
+            eos_tensor.fill_(corpus.dictionary.word2idx["<EOS>"])
+            gold = torch.cat([x, eos_tensor], dim=0)
+            pred = pred.permute(1, 2, 0)
+            gold = gold.permute(1, 0)
+            loss_val = loss(pred, gold)
 
             optimizer.zero_grad()
-            loss.backward()
+            loss_val.backward()
             if args.grad_clip > 0.0:
                 nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
             optimizer.step()
@@ -97,19 +102,37 @@ def train(args):
                 train_log.add_scalar("loss", losses[-1], global_step)
 
         model.eval()
-        eval_metrics = []
-        for x, y in valid_data:
-            x, y = x.to(device), y.to(device)
-            pred = model(x)
-            # Compute whatever metrics here
-            eval_metrics.append(0)
+        exs = []
+        for i in range(4):
+            mu = torch.zeros(1, model.latent_dim)
+            log_var = torch.ones(1, log_var)
+            z = model.reparameterize(mu, log_var)
+            z = (z.unsqueeze(0), z.unsqueeze(0))
+            # Teacher forcing here
+            SOS = torch.ones(1, 1).long().to(model.device())
+            initial, hidden = model.decode(SOS, z, None)
 
-        avg_eval_metric = np.mean(eval_metrics)
+            print(initial.shape)
+            _, word = torch.max(initial)
+            out_sequence = [corpus.dictionary.idx2word(word.item())]
+            while out_sequence[-1] != "<EOS>":
+                word = word.unsqueeze(0)
+                word, hidden = model.decode(word, z, None)
+                out_sequence.append(corpus.dictionary.idx2word(word.item()))
+                z = hidden
+            exs.append(out_sequence)
+
+        # Produce 4 examples here
         if valid_log is not None:
-            valid_log.add_scalar("eval", avg_eval_metric, global_step)
+            for i in range(len(exs):
+                name_ = "generated_example_{}".format(i)
+                valid_log.add_text(name_, exs[i], global_step)
+        else:
+            for i in range(len(exs):
+                name_ = "generated_example_{}".format(i)
+                print(name_, exs[i]))
 
-        f1 = avg_eval_metric
         avg_l = np.mean(losses)
-        print("epoch %-3d \t loss = %0.3f \t f1 = %.3f" % (epoch, avg_l, f1))
+        print("epoch %-3d \t loss = %0.3f \t" % (epoch, avg_l))
         model.save_model()
     model.save_model()
