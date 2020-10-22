@@ -2,13 +2,15 @@
 # https://github.com/pytorch/examples/blob/master/word_language_model/data.py
 import os
 import torch
-from collections import Counter
+from collections import Counter, OrderedDict
+from torch.utils.data import Sampler, Dataset, DataLoader
+from random import shuffle
 
 
 class Dictionary(object):
     def __init__(self):
-        self.word2idx = {"<SOS>": 0, "<EOS>": 1}
-        self.idx2word = ["<SOS>", "<EOS>"]
+        self.word2idx = {"<PAD": 0, "<SOS>": 1, "<EOS>": 2}
+        self.idx2word = ["<PAD", "<SOS>", "<EOS>"]
         self.counter = Counter()
         self.total = 0
 
@@ -53,15 +55,42 @@ class Corpus(object):
             idss = []
             for line in f:
                 words = line.split() + ["<eos>"]
-                ids = []
-                for word in words:
-                    ids.append(self.dictionary.word2idx[word])
-                idss.append(torch.tensor(ids).type(torch.long))
-            ids = torch.cat(idss)
-
-        return ids
+                if len(words) > 1:
+                    ids = []
+                    for word in words:
+                        ids.append(self.dictionary.word2idx[word])
+                    idss.append(torch.tensor(ids).type(torch.long))
+        return idss
 
 
 # Should return something we can get batches from - dataloader?
-def load_data(dataset):
-    return dataset
+def load_data(dataset, batch_size=256, num_workers=4):
+    dat = SentDataset(dataset)
+    return DataLoader(
+        dat,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        collate_fn=collate_sentences,
+    )
+
+
+class SentDataset(Dataset):
+    """
+    A dataset containing target sentences - just used for batching
+    and sampling.  There is no target (for training reconstruction)
+    """
+
+    def __init__(self, sents):
+        self.sents = sents
+
+    def __len__(self):
+        return len(self.sents)
+
+    def __getitem__(self, index):
+        return self.sents[index]
+
+
+# a simple custom collate function, just put them into a list!
+def collate_sentences(batch):
+    data = [item for item in batch]
+    return data
