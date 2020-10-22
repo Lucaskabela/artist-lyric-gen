@@ -35,7 +35,10 @@ def _parse_args():
 
     # Training related arguments here
     parser.add_argument(
-        "--log_dir", type=str, default="./logs/", help="Dir of logs for tb"
+        "--data", type=str, default="./data/wikitext2", help="Dir of dataset"
+    )
+    parser.add_argument(
+        "--log_dir", type=str, default=None, help="Dir of logs for tb"
     )
     parser.add_argument("-n", "--num_epoch", type=int, default=50)
     parser.add_argument("-lr", "--learning_rate", type=float, default=1e-3)
