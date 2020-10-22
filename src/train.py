@@ -5,6 +5,8 @@ PURPOSE: This file defines the code for training the neural networks in pytorch
 """
 
 from os import path
+import models
+import utils
 import numpy as np
 import torch
 import torch.nn as nn
@@ -12,21 +14,22 @@ import torch.nn.functional as F
 import torch.utils.tensorboard as tb
 
 
-def cvae_loss_function(x_p, x, mu, log_var):
+def cvae_loss_function(x_p, x, mu, log_var, alpha=0):
     """
     Loss for CVAE is BCE + KLD
         see Appendix B from Kingma and Welling 2014
+    Need alpha for KL annealing
     """
     BCE = F.binary_cross_entropy(x_p, x, reduction="sum")
     KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
-    return BCE + KLD
+    return BCE + alpha * KLD
 
 
 def train(args):
     """
     trains a model as specified by args
     """
-    model = None  # LSTM() or whatever - should be specified in args
+    model = models.CVAE()  # LSTM() or whatever - should be specified in args
     train_logger, valid_logger = None, None
     if args.log_dir is not None:
         train_logger = tb.SummaryWriter(path.join(args.log_dir, "train"))
@@ -37,16 +40,20 @@ def train(args):
     else:
         device = torch.device("cpu")
 
-    model = model.to(device)
     if args.continue_training:
         model.load_model()
+    model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     # TODO: set up load_data functions - be best if return a data loader
-    train_data = None  # load_data()
-    valid_data = None  # load_data()
+    corpus = utils.Corpus(args.data)
+    # This should return a dataloader or something to that effect
+    train_data = utils.load_data(corpus.train)
+    # This should return a dataloader or something to that effect
+    valid_data = utils.load_data(corpus.valid)
 
+    vocab = len(corpus.dictionary)
     # TODO: Change the ignore_index to padding index
     loss = nn.CrossEntropyLoss(ignore_index=-1)
 
