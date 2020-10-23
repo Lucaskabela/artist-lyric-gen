@@ -115,7 +115,7 @@ def train(args):
             pred, mu, log_var = model(x, None)
             eos_tensor = torch.empty(1, x.shape[1]).to(device)
             eos_tensor.fill_(corpus.dictionary.word2idx["<EOS>"])
-            gold = torch.cat([x, eos_tensor], dim=0)
+            gold = torch.cat([x, eos_tensor], dim=0).long()
             pred = pred.permute(1, 2, 0)
             gold = gold.permute(1, 0)
             alph = min(max(0, (global_step - 10_000) / 60_000), 1)
