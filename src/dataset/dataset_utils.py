@@ -12,7 +12,6 @@ def loop_and_process(
     objects, process_fn, item_type_name, get_obj_name_fn, data_dir, data_file_name_prefix=''
 ):
     i = 1
-    print("{} total {}".format(len(objects), item_type_name))
     start = time.time()
     os = tqdm(objects)
     for o in os:
@@ -24,7 +23,7 @@ def loop_and_process(
             #         item_type_name, i, len(objects), obj_name
             #     )
             # )
-            processed_obj = process_fn(o)
+            processed_obj = process_fn(o, os)
             # os.set_description("Finished Processing {}".format(obj_name))
             # None means skip writing data to its own file, false means do not add to list
             if processed_obj is not None and processed_obj is not False:
@@ -36,18 +35,18 @@ def loop_and_process(
                     # os.set_description("Wrote out data for {} to {}".format(obj_name, outfile.name))
             if processed_obj is not False:
                 # add to the list
-                with open("{}/{}LIST".format(data_dir,data_file_name_prefix), "a") as outfile:
+                with open("{}/_{}LIST".format(data_dir,data_file_name_prefix), "a") as outfile:
                     outfile.write("{}\n".format(obj_name))
                     # os.set_description("Wrote out {} to the list {}".format(obj_name, outfile.name))
             else:
                 # removed from list
-                with open("{}/{}REMOVED".format(data_dir,data_file_name_prefix), "a") as outfile:
+                with open("{}/_{}REMOVED".format(data_dir,data_file_name_prefix), "a") as outfile:
                     outfile.write("{}\n".format(obj_name))
                     # os.set_description("Wrote out {} to the removed list {}".format(obj_name, outfile.name))
             # os.set_description("Finished {}".format(obj_name))
         except Exception as e:
             tqdm.write("Failed to process {}".format(obj_name))
-            with open("{}/{}FAILED".format(data_dir,data_file_name_prefix), "a") as outfile:
+            with open("{}/_{}FAILED".format(data_dir,data_file_name_prefix), "a") as outfile:
                 outfile.write("{}\n".format(obj_name))
             tqdm.write(e)
             traceback.print_exc()
