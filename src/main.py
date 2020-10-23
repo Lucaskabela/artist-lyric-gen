@@ -36,7 +36,7 @@ def _parse_args():
     # Hyperparameters are default from Song et al. 2019
     # Persona information for...
     parser.add_argument("-e", "--embedding", type=int, default=300)
-    parser.add_argument("-h", "--hidden", type=int, default=500)
+    parser.add_argument("-hd", "--hidden", type=int, default=500)
     parser.add_argument("-l", "--latent", type=int, default=100)
     parser.add_argument("-d", "--dropout", type=float, default=0.1)
 
