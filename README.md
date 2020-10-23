@@ -21,6 +21,6 @@ See setup.sh to get started and install requirements for the project
  - [ x ] Scope out future work for project
  - [ ] Collect data from Genius
  - [ ] Write BART baseline
- - [ ] Write GhostWriter LSTM baselin (?)
+ - [ ] Write GhostWriter LSTM baseline (?)
  - [ ] Implement CVAE
  - [ ] Evaluation Code
