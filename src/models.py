@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from os import path
+import pathlib
 
 
 class BaseNetwork(nn.Module):
@@ -18,8 +19,10 @@ class BaseNetwork(nn.Module):
         return next(self.parameters()).device
 
     def save_model(self):
+        dir = "ckpt"
+        pathlib.Path(dir).mkdir(parents=True, exist_ok=True)
         file_name = "{}.th".format(self.name)
-        fn = path.join("ckpt", file_name)
+        fn = path.join(dir, file_name)
         return torch.save(
             self.state_dict(),
             path.join(path.dirname(path.abspath(__file__)), fn),
@@ -28,6 +31,8 @@ class BaseNetwork(nn.Module):
     def load_model(self):
         file_name = "{}.th".format(self.name)
         fn = path.join("ckpt", file_name)
+        if not path.exists(fn):
+            raise Exception("Missing saved model")
         self.load_state_dict(
             torch.load(
                 path.join(path.dirname(path.abspath(__file__)), fn),
@@ -80,6 +85,7 @@ class CVAE(BaseNetwork):
         self.vocab_size = vocab
         self.emb_dim = emb_dim
         self.hidden_size = hidden_size
+        self.latent_dim = latent_dim
         self.name = name
 
         self.embedding = nn.Embedding(self.vocab_size, emb_dim)
