@@ -104,33 +104,33 @@ def train(args):
         model.eval()
         exs = []
         for i in range(4):
-            mu = torch.zeros(1, model.latent_dim)
-            log_var = torch.ones(1, log_var)
+            mu = torch.zeros(1, model.latent_dim).to(model.device())
+            log_var = torch.ones(1, model.latent_dim).to(model.device())
             z = model.reparameterize(mu, log_var)
             z = (z.unsqueeze(0), z.unsqueeze(0))
             # Teacher forcing here
             SOS = torch.ones(1, 1).long().to(model.device())
             initial, hidden = model.decode(SOS, z, None)
 
-            print(initial.shape)
-            _, word = torch.max(initial)
-            out_sequence = [corpus.dictionary.idx2word(word.item())]
-            while out_sequence[-1] != "<EOS>":
+            _, word = torch.max(initial, dim=-1)
+            out_sequence = [corpus.dictionary.idx2word[word.item()]]
+            while out_sequence[-1] != "<EOS>" and len(out_sequence) < 15:
                 word = word.unsqueeze(0)
                 word, hidden = model.decode(word, z, None)
-                out_sequence.append(corpus.dictionary.idx2word(word.item()))
+                _, word = torch.max(word, dim=-1)
+                out_sequence.append(corpus.dictionary.idx2word[word.item()])
                 z = hidden
             exs.append(out_sequence)
 
         # Produce 4 examples here
         if valid_log is not None:
-            for i in range(len(exs):
+            for i in range(len(exs)):
                 name_ = "generated_example_{}".format(i)
                 valid_log.add_text(name_, exs[i], global_step)
         else:
-            for i in range(len(exs):
+            for i in range(len(exs)):
                 name_ = "generated_example_{}".format(i)
-                print(name_, exs[i]))
+                print(name_, exs[i])
 
         avg_l = np.mean(losses)
         print("epoch %-3d \t loss = %0.3f \t" % (epoch, avg_l))
