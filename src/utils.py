@@ -2,9 +2,8 @@
 # https://github.com/pytorch/examples/blob/master/word_language_model/data.py
 import os
 import torch
-from collections import Counter, OrderedDict
-from torch.utils.data import Sampler, Dataset, DataLoader
-from random import shuffle
+from collections import Counter
+from torch.utils.data import Dataset, DataLoader
 
 
 class Dictionary(object):
@@ -46,7 +45,7 @@ class Corpus(object):
         # Add words to the dictionary
         with open(path, "r", encoding="utf8") as f:
             for line in f:
-                words = line.split() + ["<eos>"]
+                words = line.split() + ["<EOS>"]
                 for word in words:
                     self.dictionary.add_word(word)
 
@@ -54,7 +53,7 @@ class Corpus(object):
         with open(path, "r", encoding="utf8") as f:
             idss = []
             for line in f:
-                words = line.split() + ["<eos>"]
+                words = line.split() + ["<EOS>"]
                 if len(words) > 1:
                     ids = []
                     for word in words:
