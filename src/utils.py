@@ -3,13 +3,14 @@
 import os
 import torch
 from collections import Counter
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
 
 
 class Dictionary(object):
     def __init__(self):
-        self.word2idx = {"<PAD": 0, "<SOS>": 1, "<EOS>": 2}
-        self.idx2word = ["<PAD", "<SOS>", "<EOS>"]
+        self.word2idx = {"<PAD": 0, "<SOS>": 1, "<EOS>": 2, "<UNK>": 3}
+        self.idx2word = ["<PAD", "<SOS>", "<EOS>", "<UNK>"]
         self.counter = Counter()
         self.total = 0
 
@@ -63,13 +64,14 @@ class Corpus(object):
 
 
 # Should return something we can get batches from - dataloader?
-def load_data(dataset, batch_size=256, num_workers=4):
+def load_data(dataset, batch_size=256, num_workers=2):
     dat = SentDataset(dataset)
     return DataLoader(
         dat,
         batch_size=batch_size,
         num_workers=num_workers,
-        collate_fn=collate_sentences,
+        shuffle=True,
+        collate_fn=collate_pad_sentences,
     )
 
 
@@ -90,6 +92,7 @@ class SentDataset(Dataset):
 
 
 # a simple custom collate function, just put them into a list!
-def collate_sentences(batch):
-    data = [item for item in batch]
-    return data
+def collate_pad_sentences(batch):
+    batch_lens = [len(x) for x in batch]
+    batch_pad = pad_sequence(batch, batch_first=True, padding_value=0)
+    return batch_pad, batch_lens
