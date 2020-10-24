@@ -20,7 +20,7 @@ def vae_loss_function(x_p, x, mu, log_var, alpha=0):
         see Appendix B from Kingma and Welling 2014
     Need alpha for KL annealing
     """
-    BCE = F.cross_entropy(x_p, x, reduction="sum", ignore_index=0)
+    BCE = F.nll_loss(x_p, x, reduction="sum", ignore_index=0)
     KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
     return BCE + alpha * KLD
 
@@ -46,37 +46,68 @@ def init_logger(log_dir=None):
     return train_logger, valid_logger
 
 
-def eval_inference(model, corpus, valid_log, global_step):
+def eval_inference(model, corpus, valid_log, global_step, n=4):
+    max_length = 30
     model.eval()
-    exs = []
-    for i in range(4):
-        mu = torch.zeros(1, model.latent_dim).to(model.device())
-        log_var = torch.ones(1, model.latent_dim).to(model.device())
-        z = model.reparameterize(mu, log_var)
-        z = (z.unsqueeze(0), z.unsqueeze(0))
-        # Teacher forcing here
-        SOS = torch.ones(1, 1).long().to(model.device())
-        initial, hidden = model.decode(SOS, z, None)
+    z = torch.randn([n, model.latent_size])
+    z = model.latent2hidden(z)
+    hidden = (z.unsqueeze(0), z.unsqueeze(0))
 
-        _, word = torch.max(initial, dim=-1)
-        out_sequence = [corpus.dictionary.idx2word[word.item()]]
-        while out_sequence[-1] != "<EOS>" and len(out_sequence) < 15:
-            word = word.unsqueeze(0)
-            word, hidden = model.decode(word, z, None)
-            _, word = torch.max(word, dim=-1)
-            out_sequence.append(corpus.dictionary.idx2word[word.item()])
-            z = hidden
-        exs.append(out_sequence)
+    # Teacher forcing here
+    # required for dynamic stopping of sentence generation
+    sequence_idx = torch.arange(0, n).long()  # all idx of batch
+    # all idx of batch which are still generating
+    sequence_running = torch.arange(0, n).long()
+    sequence_mask = torch.ones(n).bool()
+    # idx of still generating sequences with respect to current loop
+    running_seqs = torch.arange(0, n.long())
+
+    generations = torch.tensor(n, max_length).fill_(1).long()
+    t = 0
+    while t < max_length and len(running_seqs) > 0:
+
+        if t == 0:
+            input_sequence = torch.Tensor(n).fill_(1).long()
+
+        input_sequence = input_sequence.unsqueeze(1)
+
+        input_embedding = model.embedding(input_sequence)
+
+        output, hidden = model.decode(input_embedding, hidden)
+
+        logits = F.softmax(model.out(output), dim=-1)
+
+        input_sequence = torch.max(logits, dim=-1)
+
+        # save next input
+        generations[running_seqs][t] = input_sequence
+
+        # update gloabl running sequence
+        sequence_mask[sequence_running] = input_sequence != 2
+        sequence_running = sequence_idx.masked_select(sequence_mask)
+
+        # update local running sequences
+        running_mask = (input_sequence != 2).data
+        running_seqs = running_seqs.masked_select(running_mask)
+
+        # prune input and hidden state according to local update
+        if len(running_seqs) > 0:
+            input_sequence = input_sequence[running_seqs]
+            hidden = hidden[:, running_seqs]
+
+            running_seqs = torch.arange(0, len(running_seqs)).long()
+
+        t += 1
 
     # Produce 4 examples here
     if valid_log is not None:
-        for i in range(len(exs)):
+        for i in range(len(generations)):
             name_ = "generated_example_{}".format(i)
-            valid_log.add_text(name_, exs[i], global_step)
+            valid_log.add_text(name_, str(generations[i]), global_step)
     else:
-        for i in range(len(exs)):
+        for i in range(len(generations)):
             name_ = "generated_example_{}".format(i)
-            print(name_, exs[i])
+            print(name_, generations[i])
 
 
 def train(args):
@@ -108,18 +139,17 @@ def train(args):
 
         model.train()
         losses = []
-        for x in train_data:
+        for x, x_len in train_data:
             # Now we need to make sure everything in the batch has same size
-            x = nn.utils.rnn.pad_sequence(x, padding_value=0).to(device)
-
-            pred, mu, log_var = model(x, None)
-            eos_tensor = torch.empty(1, x.shape[1]).to(device)
+            x = x.to(device)
+            pred, mu, log_var = model(x, x_len, None)
+            eos_tensor = torch.empty(x.shape[0], 1).to(device)
             eos_tensor.fill_(corpus.dictionary.word2idx["<EOS>"])
             gold = torch.cat([x, eos_tensor], dim=0).long()
-            pred = pred.permute(1, 2, 0)
-            gold = gold.permute(1, 0)
             alph = min(max(0, (global_step - 10_000) / 60_000), 1)
+            # Get loss, normalized by batch size
             loss_val = loss(pred, gold, mu, log_var, alpha=alph)
+            loss_val /= args.batch_size
 
             optimizer.zero_grad()
             loss_val.backward()
