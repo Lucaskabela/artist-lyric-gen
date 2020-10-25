@@ -49,7 +49,7 @@ def init_logger(log_dir=None):
 def eval_inference(model, corpus, valid_log, global_step, n=4):
     max_length = 30
     model.eval()
-    z = torch.randn([n, model.latent_size])
+    z = torch.randn([n, model.latent_dim])
     z = model.latent2hidden(z)
     hidden = (z.unsqueeze(0), z.unsqueeze(0))
 
@@ -60,7 +60,7 @@ def eval_inference(model, corpus, valid_log, global_step, n=4):
     sequence_running = torch.arange(0, n).long()
     sequence_mask = torch.ones(n).bool()
     # idx of still generating sequences with respect to current loop
-    running_seqs = torch.arange(0, n.long())
+    running_seqs = torch.arange(0, n).long()
 
     generations = torch.tensor(n, max_length).fill_(1).long()
     t = 0
@@ -141,12 +141,13 @@ def train(args):
         losses = []
         for x, x_len in train_data:
             # Now we need to make sure everything in the batch has same size
-            x = x.to(device)
+            x, x_len = x.to(device), x_len.to(device)
             pred, mu, log_var = model(x, x_len, None)
             eos_tensor = torch.empty(x.shape[0], 1).to(device)
             eos_tensor.fill_(corpus.dictionary.word2idx["<EOS>"])
-            gold = torch.cat([x, eos_tensor], dim=0).long()
+            gold = torch.cat([x, eos_tensor], dim=1).long()
             alph = min(max(0, (global_step - 10_000) / 60_000), 1)
+            pred = pred.permute(1, 0, 2)
             # Get loss, normalized by batch size
             loss_val = loss(pred, gold, mu, log_var, alpha=alph)
             loss_val /= args.batch_size
