@@ -93,6 +93,6 @@ class SentDataset(Dataset):
 
 # a simple custom collate function, just put them into a list!
 def collate_pad_sentences(batch):
-    batch_lens = [len(x) for x in batch]
+    batch_lens = torch.LongTensor([len(x) for x in batch])
     batch_pad = pad_sequence(batch, batch_first=True, padding_value=0)
     return batch_pad, batch_lens
