@@ -4,7 +4,7 @@ from dataset_utils import loop_and_process, name_to_file_name, read_list_from_fi
 from verse_songs_extract_artists import verse_artists_dir
 
 marked_verses_dir = "marked_verses"
-skipped_artists_file = "SKIPPED_ARTISTS"
+skipped_artists_file = "_SKIPPED_ARTISTS"
 
 def is_verse_artist_valid(verse, artist_list):
     def write_out_artist(artist):
@@ -31,7 +31,7 @@ def has_enough_lines(verse):
     return len(re.findall('\n', verse['lyrics'])) >= 5
 
 def get_process_song(artist_list):
-    def process_song(song):
+    def process_song(song, bar):
         with open("{}/{}.json".format(verse_artists_dir, name_to_file_name(song))) as song_file:
             song = json.load(song_file)
         for verse in song['verses']:
@@ -47,7 +47,7 @@ def get_process_song(artist_list):
 
 def mark_verses(song_list_path):
     song_list = read_list_from_file(song_list_path)
-    artist_list = read_list_from_file('get_artists.csv')
+    artist_list = read_list_from_file('cleaned_artist_names.txt')
     process_song = get_process_song(artist_list)
     loop_and_process(song_list, process_song, "Song", lambda x: x, marked_verses_dir)
     remove_duplicates_from_list_file(marked_verses_dir, skipped_artists_file)

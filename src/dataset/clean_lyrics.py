@@ -7,12 +7,13 @@ from get_songs import raw_songs_dir
 cleaned_songs_dir = "cleaned_raw_lyrics"
 
 def clean_lyrics(s):
+    if s is None:
+        return ""
     cleaned_lyrics = s.lower()
     # Do the cleaning steps
     # Removes (...), {...}, * ... *
     # Removes [?]
     cleaned_lyrics = re.sub(r'\[\?\]', ' ', cleaned_lyrics)
-    #TODO: Add more cleaning
     # Removes extra spaces
     cleaned_lyrics = re.sub(r' +', ' ', cleaned_lyrics)
     # Removes extra lines, and strips lines

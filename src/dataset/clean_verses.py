@@ -1,6 +1,6 @@
 import json
 import re
-from dataset_utils import loop_and_process, name_to_file_name, read_list_from_file, write_list_to_file, remove_duplicates_from_list_file
+from dataset_utils import loop_and_process, name_to_file_name, read_list_from_file, write_list_to_file, remove_duplicates_from_list_file, clean_artist_names
 from tqdm import tqdm
 from raw_song_to_verse_split_song_files import verse_split_songs_dir
 
@@ -9,12 +9,10 @@ removed_verse_metadata_file = '_REMOVED_VERSES'
 
 def clean_lyrics(s):
     # Do the cleaning steps
-    # TODO: ADD MORE CLEANING
     cleaned_lyrics = s
     # Removes (...), {...}, * ... *
     cleaned_lyrics = re.sub(r'\(([^\)]+)\)|\*([^\*]+)\*|\{([^\}]+)\}', '', cleaned_lyrics)
-    # Removes extra spaces
-    cleaned_lyrics = re.sub(r' +', ' ', cleaned_lyrics)
+    cleaned_lyrics = clean_artist_names(cleaned_lyrics)
     # Removes extra lines, and strips lines
     lines = [line.strip() for line in cleaned_lyrics.split('\n')]
     lines = list(filter(lambda s: s != '', lines))
