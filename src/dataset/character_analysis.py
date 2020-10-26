@@ -2,6 +2,7 @@ import argparse
 import json
 import datetime
 import time
+import re
 from tqdm import tqdm
 from dataset_utils import loop_and_process, name_to_file_name, read_list_from_file
 from get_songs import raw_songs_dir
@@ -38,7 +39,8 @@ def analyze_characters(dir_path, list_file, input_format):
             for lyrics in lyric_blocks:
                 for i in range(0, len(lyrics)):
                     c = lyrics[i]
-                    if not c.isalnum() and c not in char_allow_list:
+                    if re.search(r'\W', c) is not None and c not in char_allow_list:
+                        # add to characters dictionary
                         if c not in character_dict.keys():
                             character_dict[c] = {
                                 "count" : 1,
