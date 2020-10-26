@@ -67,6 +67,52 @@ def write_list_to_file(l, list_path, mode):
 def remove_duplicates_from_list_file(dir_name, file_name):
     print('Removing duplicates from list {}/{}'.format(dir_name, file_name))
     l = read_list_from_file('{}/{}'.format(dir_name, file_name))
-    s = set(l)
+    s = list(set(l))
+    s.sort()
     write_list_to_file(s, '{}/{}'.format(dir_name, file_name), 'w')
     print('Done removing duplicates')
+
+def compress_spaces(s):
+    s = re.sub(r' +', ' ', s)
+    return s
+
+def remove_special_characters(s):
+    #TODO: implement this and compress spaces?
+    # letter changing
+    s = re.sub(r"é", "e", s)
+    s = re.sub(r"á", "a", s)
+    s = re.sub(r"ó", "o", s)
+    s = re.sub(r"ø", "o", s)
+    s = re.sub(r"ë", "e", s)
+    s = re.sub(r"ë", "e", s)
+    s = re.sub(r"ý", "y", s)
+    # dollar signs for numbers
+    # removes commas from numbers
+    s = re.sub(r"(\d),(\d)", r"\1\2", s)
+    # changes $100 to 100 dollar
+    s = re.sub(r"(\$)([\d,\.]+)", r"\2 dollar ", s)
+    # changes non dollar sign $ to s
+    s = re.sub(r"\$", "s", s)
+    # change % to percent
+    s = re.sub("\%", " percent ", s)
+    # @ to at
+    s = re.sub(r"\@\'n", 'at\'n', s)
+    s = re.sub(r"\@", ' at ', s)
+    # #1 to number 1
+    s = re.sub(r"(\#)(\d)", r" number \2", s)
+    # these symbols get removed
+    s = re.sub(r"\'|\′", "", s)
+    # everything else to spaces
+    s = re.sub(r"[^\w\n]", " ", s)
+    s = compress_spaces(s)
+    return s
+
+def clean_artist_names(s):
+    #TODO: get the way yo clean artist names
+    s = s.lower()
+    s = re.sub(r"6ix9ine", "six nine", s)
+    s = re.sub(r"sixx-nine", "six nine", s)
+    s = re.sub(r"ty\$", "ty dolla sign", s)
+    s = re.sub(r"n9ne", "nine", s)
+    s = remove_special_characters(s)
+    return s
