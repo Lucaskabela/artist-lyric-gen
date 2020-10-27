@@ -13,7 +13,7 @@ artist_lyric_dir = 'raw_artist_lyrics'
 
 def instantiate_genius():
     genius = lyricsgenius.Genius(GENIUS_ACCESS_TOKEN, timeout=30)
-    genius.excluded_terms = ["Remix", "Live", "Intro", "Outro", "Freestyle", "Demo", "Interlude", "Snippet", "Excerpts", "Medley", "MTV", "Radio", "Edit", "Skit"]
+    genius.excluded_terms = ["Remix", "Live", "Intro", "Outro", "Freestyle", "Demo", "Interlude", "Snippet", "Excerpts", "Medley", "MTV", "Radio", "Edit", "Skit", "Discography"]
     return genius
 
 def get_songs(name=None, csv=None):

@@ -19,6 +19,11 @@ def filter_lyrics(lyrics, title, bar):
 
 
 def filter_song(song, bar):
+    # TODO: this is just because i don't want to rescrape, remove this since
+    # we already added it to the scrape code
+    if "discography" in song['title'].lower():
+        # remove such a song
+        return True
     if len(song['verses']) == 0:
         bar.write("XXXX {} has no verses".format(song['title']))
         return True
@@ -27,6 +32,16 @@ def filter_song(song, bar):
         return True
     all_lyrics = ''
     for verse in song['verses']:
+        # get lines
+        lines = [line.strip() for line in verse['lyrics'].split('\n')]
+        lines = list(filter(lambda s: s != '', lines))
+        for line in lines:
+            words = [word.strip() for word in line.split()]
+            words = list(filter(lambda s: s != '', words))
+            # if a line has more than 25 words, its probably not from a song
+            if len(words) > 25:
+                bar.write("---- {} Too many words in a line".format(song['title']))
+                return True
         all_lyrics = all_lyrics + verse['lyrics']
     # cant use a song with another language in it
     if filter_lyrics(all_lyrics, song['title'], bar):

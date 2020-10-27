@@ -3,6 +3,7 @@ import datetime
 import time
 import re
 import traceback
+import unidecode
 from tqdm import tqdm
 
 def name_to_file_name(name):
@@ -77,15 +78,9 @@ def compress_spaces(s):
     return s
 
 def remove_special_characters(s):
-    #TODO: implement this and compress spaces?
     # letter changing
-    s = re.sub(r"é", "e", s)
-    s = re.sub(r"á", "a", s)
-    s = re.sub(r"ó", "o", s)
-    s = re.sub(r"ø", "o", s)
-    s = re.sub(r"ë", "e", s)
-    s = re.sub(r"ë", "e", s)
-    s = re.sub(r"ý", "y", s)
+    s = unidecode.unidecode(s)
+    s = s.lower()
     # dollar signs for numbers
     # removes commas from numbers
     s = re.sub(r"(\d),(\d)", r"\1\2", s)
@@ -101,9 +96,9 @@ def remove_special_characters(s):
     # #1 to number 1
     s = re.sub(r"(\#)(\d)", r" number \2", s)
     # these symbols get removed
-    s = re.sub(r"\'|\′", "", s)
+    s = re.sub(r"\'|\′|\u2019|\u00b4|\u2032|\`|\u2018", "", s)
     # everything else to spaces
-    s = re.sub(r"[^\w\n]", " ", s)
+    s = re.sub(r"[^a-zA-Z0-9\n]", " ", s)
     s = compress_spaces(s)
     return s
 
