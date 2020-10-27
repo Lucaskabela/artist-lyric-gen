@@ -46,68 +46,34 @@ def init_logger(log_dir=None):
     return train_logger, valid_logger
 
 
-def eval_inference(model, corpus, valid_log, global_step, n=4):
-    max_length = 30
+def eval_inference(model, corpus, valid_log, global_step):
+    max_len = 30
     model.eval()
-    z = torch.randn([n, model.latent_dim])
-    z = model.latent2hidden(z)
-    hidden = (z.unsqueeze(0), z.unsqueeze(0))
-
-    # Teacher forcing here
-    # required for dynamic stopping of sentence generation
-    sequence_idx = torch.arange(0, n).long()  # all idx of batch
-    # all idx of batch which are still generating
-    sequence_running = torch.arange(0, n).long()
-    sequence_mask = torch.ones(n).bool()
-    # idx of still generating sequences with respect to current loop
-    running_seqs = torch.arange(0, n).long()
-
-    generations = torch.tensor(n, max_length).fill_(1).long()
-    t = 0
-    while t < max_length and len(running_seqs) > 0:
-
-        if t == 0:
-            input_sequence = torch.Tensor(n).fill_(1).long()
-
-        input_sequence = input_sequence.unsqueeze(1)
-
-        input_embedding = model.embedding(input_sequence)
-
-        output, hidden = model.decode(input_embedding, hidden)
-
-        logits = F.softmax(model.out(output), dim=-1)
-
-        input_sequence = torch.max(logits, dim=-1)
-
-        # save next input
-        generations[running_seqs][t] = input_sequence
-
-        # update gloabl running sequence
-        sequence_mask[sequence_running] = input_sequence != 2
-        sequence_running = sequence_idx.masked_select(sequence_mask)
-
-        # update local running sequences
-        running_mask = (input_sequence != 2).data
-        running_seqs = running_seqs.masked_select(running_mask)
-
-        # prune input and hidden state according to local update
-        if len(running_seqs) > 0:
-            input_sequence = input_sequence[running_seqs]
-            hidden = hidden[:, running_seqs]
-
-            running_seqs = torch.arange(0, len(running_seqs)).long()
-
-        t += 1
+    exs = []
+    for i in range(4):
+        out_sequence = ["<sos>"]
+        z = torch.randn([1, model.latent_dim])
+        z = model.latent2hidden(z)
+        hidden = (z.unsqueeze(0), z.unsqueeze(0))
+        # Teacher forcing here
+        word = torch.ones(1).long().to(model.device())
+        while out_sequence[-1] != "<eos>" and len(out_sequence) < max_len:
+            word = model.embedding(word.unsqueeze(0))
+            outputs, hidden = model.decoder(word, hidden)
+            outputs = F.log_softmax(model.out(outputs), dim=-1)
+            _, word = torch.max(outputs, dim=-1)
+            out_sequence.append(corpus.dictionary.idx2word[word.item()])
+        exs.append(out_sequence)
 
     # Produce 4 examples here
     if valid_log is not None:
-        for i in range(len(generations)):
+        for i in range(len(exs)):
             name_ = "generated_example_{}".format(i)
-            valid_log.add_text(name_, str(generations[i]), global_step)
+            valid_log.add_text(name_, str(exs[i]), global_step)
     else:
-        for i in range(len(generations)):
+        for i in range(len(exs)):
             name_ = "generated_example_{}".format(i)
-            print(name_, generations[i])
+            print(name_, exs[i])
 
 
 def train(args):
@@ -147,7 +113,7 @@ def train(args):
             eos_tensor.fill_(corpus.dictionary.word2idx["<eos>"])
             gold = torch.cat([x, eos_tensor], dim=1).long()
             alph = min(max(0, (global_step - 10_000) / 60_000), 1)
-            pred = pred.permute(1, 0, 2)
+            pred = pred.permute(0, 2, 1)
             # Get loss, normalized by batch size
             loss_val = loss(pred, gold, mu, log_var, alpha=alph)
             loss_val /= args.batch_size
