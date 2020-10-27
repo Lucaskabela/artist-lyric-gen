@@ -9,8 +9,8 @@ from torch.utils.data import Dataset, DataLoader
 
 class Dictionary(object):
     def __init__(self):
-        self.word2idx = {"<PAD": 0, "<SOS>": 1, "<EOS>": 2, "<UNK>": 3}
-        self.idx2word = ["<PAD", "<SOS>", "<EOS>", "<UNK>"]
+        self.word2idx = {"<pad>": 0, "<sos>": 1, "<eos>": 2, "<unk>": 3}
+        self.idx2word = ["<pad>", "<sos>", "<eos>", "<unk>"]
         self.counter = Counter()
         self.total = 0
 
@@ -46,7 +46,7 @@ class Corpus(object):
         # Add words to the dictionary
         with open(path, "r", encoding="utf8") as f:
             for line in f:
-                words = line.split() + ["<EOS>"]
+                words = line.split() + ["<eos>"]
                 for word in words:
                     self.dictionary.add_word(word)
 
@@ -54,7 +54,7 @@ class Corpus(object):
         with open(path, "r", encoding="utf8") as f:
             idss = []
             for line in f:
-                words = line.split() + ["<EOS>"]
+                words = line.split() + ["<eos>"]
                 if len(words) > 1:
                     ids = []
                     for word in words:
