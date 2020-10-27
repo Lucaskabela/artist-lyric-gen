@@ -24,7 +24,7 @@ def get_lyric_blocks(song, input_format):
         return [verse['lyrics'] for verse in song['verses']]
     return []
 
-def analyze_characters(dir_path, list_file, input_format):
+def analyze_characters(dir_path, list_file, input_format, out_file):
     song_list = read_list_from_file("{}/{}".format(dir_path, list_file))
     character_dict = {}
     j = 1
@@ -39,7 +39,7 @@ def analyze_characters(dir_path, list_file, input_format):
             for lyrics in lyric_blocks:
                 for i in range(0, len(lyrics)):
                     c = lyrics[i]
-                    if re.search(r'\W', c) is not None and c not in char_allow_list:
+                    if re.search(r'[^a-zA-Z0-9]+', c) is not None and c not in char_allow_list:
                         # add to characters dictionary
                         if c not in character_dict.keys():
                             character_dict[c] = {
@@ -51,7 +51,7 @@ def analyze_characters(dir_path, list_file, input_format):
                             character_dict[c]['count'] = character_dict[c]['count'] + 1
                             character_dict[c]['context'].append({"song": song_name, "line": get_context(lyrics, i)})
         j = j + 1
-    with open("character_stats.json", "w") as openfile:
+    with open("{}.json".format(out_file), "w") as openfile:
         json.dump(character_dict, openfile)
     time_taken = str(datetime.timedelta(seconds=time.time() - start))
     print("{} for {}".format(time_taken, len(song_list)))
