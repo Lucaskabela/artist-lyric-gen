@@ -52,13 +52,13 @@ def eval_inference(model, corpus, valid_log, global_step):
     exs = []
     for i in range(4):
         out_sequence = ["<sos>"]
-        z = torch.randn([1, model.latent_dim])
+        z = torch.randn([1, model.latent_dim], device=model.device())
         z = model.latent2hidden(z)
         hidden = (z.unsqueeze(0), z.unsqueeze(0))
         # Teacher forcing here
-        word = torch.ones(1).long().to(model.device())
+        word = torch.ones([1, 1], dtype=torch.long, device=model.device())
         while out_sequence[-1] != "<eos>" and len(out_sequence) < max_len:
-            word = model.embedding(word.unsqueeze(0))
+            word = model.embedding(word)
             outputs, hidden = model.decoder(word, hidden)
             outputs = F.log_softmax(model.out(outputs), dim=-1)
             _, word = torch.max(outputs, dim=-1)
