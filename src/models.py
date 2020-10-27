@@ -164,7 +164,7 @@ class CVAE(BaseNetwork):
         padded_outputs = padded_outputs[reversed_idx]
 
         # Project output to vocab
-        output = F.softmax(self.out(padded_outputs), dim=-1)
+        output = F.log_softmax(self.out(padded_outputs), dim=-1)
         return output
 
     def forward(self, x, x_lengths, c):
