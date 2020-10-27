@@ -4,12 +4,22 @@ train.py
 PURPOSE: This file defines the code for training the neural networks in pytorch
 """
 
-from .models import save_model, load_model
 from os import path
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.utils.tensorboard as tb
+
+
+def cvae_loss_function(x_p, x, mu, log_var):
+    """
+    Loss for CVAE is BCE + KLD
+        see Appendix B from Kingma and Welling 2014
+    """
+    BCE = F.binary_cross_entropy(x_p, x, reduction="sum")
+    KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+    return BCE + KLD
 
 
 def train(args):
@@ -29,7 +39,7 @@ def train(args):
 
     model = model.to(device)
     if args.continue_training:
-        model = load_model(model)
+        model.load_model()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
@@ -78,6 +88,5 @@ def train(args):
         f1 = avg_eval_metric
         avg_l = np.mean(losses)
         print("epoch %-3d \t loss = %0.3f \t f1 = %.3f" % (epoch, avg_l, f1))
-        save_model(model)
-
-    save_model(model)
+        model.save_model()
+    model.save_model()
