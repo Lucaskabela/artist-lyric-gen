@@ -144,7 +144,7 @@ def train(args):
             x, x_len = x.to(device), x_len.to(device)
             pred, mu, log_var = model(x, x_len, None)
             eos_tensor = torch.empty(x.shape[0], 1).to(device)
-            eos_tensor.fill_(corpus.dictionary.word2idx["<EOS>"])
+            eos_tensor.fill_(corpus.dictionary.word2idx["<eos>"])
             gold = torch.cat([x, eos_tensor], dim=1).long()
             alph = min(max(0, (global_step - 10_000) / 60_000), 1)
             pred = pred.permute(1, 0, 2)
