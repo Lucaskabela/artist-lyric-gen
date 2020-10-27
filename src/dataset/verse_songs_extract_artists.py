@@ -68,4 +68,5 @@ def verse_songs_extract_artists(song_list_path, dir_prefix):
     song_list = read_list_from_file(song_list_path)
     loop_and_process(song_list, process_song, "Song", get_song_name, dir_prefix)
     remove_duplicates_from_list_file(verse_artists_dir, artists_list_file)
+    remove_duplicates_from_list_file(verse_artists_dir, raw_artists_list_file)
 

@@ -17,7 +17,7 @@ def is_verse_artist_valid(verse, artist_list):
         # write out the artists we skip, can verify if we need to
         # clean any artist names
         write_out_artist(verse['artists'][0])
-        return True
+        return False
     else:
         return True
 
