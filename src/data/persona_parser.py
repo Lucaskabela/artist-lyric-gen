@@ -21,12 +21,20 @@ def _parse_args():
         help="File containing personas",
     )
     parser.add_argument(
-        "--save-data",
+        "--save-json-data",
         type=str,
         default="./personas.json",
         help="File to save personas",
     )
+    parser.add_argument(
+        "--save-persona-txt",
+        type=str,
+        default="./personas.txt",
+        help="Text file to save natural personas",
+    )
+    parser.add_argument("--save-persona-json", action="store_true", default=False)
     parser.add_argument("--save-persona", action="store_true", default=False)
+    parser.add_argument("--natural", action="store_true", default=False)
     args = parser.parse_args()
     return args
 
@@ -58,9 +66,9 @@ class Persona:
         persona.real_name = line[1]
         persona.city = line[2]
         persona.nicknames = line[3]
-        persona.group = line[4]
-        persona.discog = line[5]
-        persona.year = line[6]
+        persona.year = line[4]
+        persona.group = line[5]
+        persona.discog = line[6]
         return persona
 
     def to_nn_input(
@@ -73,26 +81,49 @@ class Persona:
         use_year=True,
     ):
         res = ["<name>", self.name]
-        if use_rn:
+        if use_rn and not self.real_name == "":
             res.append("<real name>")
             res.append(self.real_name)
-        if use_city:
+        if use_city and not self.city == "":
             res.append("<city>")
             res.append(self.city)
-        if use_nn:
+        if use_nn and not self.nicknames == "":
             res.append("<nicknames>")
             res.append(self.nicknames)
-        if use_group:
+        if use_group and not self.group == "":
             res.append("<groups>")
             res.append(self.group)
-        if use_discog:
+        if use_discog and not self.discog == "":
             res.append("<albums>")
             res.append(self.discog)
-        if use_nn:
+        if use_year and not self.year == "":
             res.append("<year>")
             res.append(self.year)
         return " ".join(res)
 
+    def to_natural_input(
+        self,
+        use_rn=True,
+        use_city=True,
+        use_nn=True,
+        use_group=True,
+        use_discog=True,
+        use_year=True,
+    ):
+        res = ["I am {}.".format(self.name)]
+        if use_rn and not self.real_name == "":
+            res.append("My real name is {}.".format(self.real_name))
+        if use_city and not self.city == "":
+            res.append("I come from {}.".format(self.city))
+        if use_nn and not self.nicknames == "":
+            res.append("I am also known as {}.".format(self.nicknames))
+        if use_group and not self.group == "":
+            res.append("I have been a part of groups like {}.".format(self.group))
+        if use_discog and not self.discog == "":
+            res.append("I have released albums such as {}.".format(self.discog))
+        if use_year and not self.year == "":
+            res.append("I have been rapping since {}.".format(self.year))
+        return " ".join(res)
 
 def create_personas(persona_file_name):
     """
@@ -124,12 +155,21 @@ def save_personas(save_file_name, personas):
     with open(save_file_name, 'w') as save_file:
         json.dump(personas, save_file, cls=PersonaEncoder)
 
+def save_personas_txt(save_file_name, personas, natural=False):
+    with open(save_file_name, 'w') as save_file:
+        for persona in personas.values():
+            written_descrip = persona.to_nn_input()
+            if natural:
+                written_descrip = persona.to_natural_input()
+            save_file.write("".join([written_descrip, "\n"]))
 
 def main():
     args = _parse_args()
     personas = create_personas(args.persona_data)
+    if args.save_persona_json:
+        save_personas(args.save_json_data, personas)
     if args.save_persona:
-        save_personas(args.save_data, personas)
+        save_personas_txt(args.save_persona_txt, personas, args.natural)
     return personas
 
 
