@@ -17,13 +17,13 @@ def _parse_args():
     parser.add_argument(
         "--persona-data",
         type=str,
-        default="./data/personas.csv",
+        default="./personas.csv",
         help="File containing personas",
     )
     parser.add_argument(
         "--save-data",
         type=str,
-        default="./data/personas.json",
+        default="./personas.json",
         help="File to save personas",
     )
     parser.add_argument("--save-persona", action="store_true", default=False)
@@ -34,7 +34,7 @@ def _parse_args():
 class PersonaEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Persona):
-            return Persona.to_json(obj)
+            return obj.to_json()
         return json.JSONEncoder.default(self, obj)
 
 
@@ -43,7 +43,6 @@ class Persona:
         self.name = None
 
     def to_json(self):
-        print(self.__dict__)
         return json.dumps(self.__dict__)
 
     @staticmethod
@@ -62,6 +61,7 @@ class Persona:
         persona.group = line[4]
         persona.discog = line[5]
         persona.year = line[6]
+        return persona
 
     def to_nn_input(
         self,
@@ -103,7 +103,7 @@ def create_personas(persona_file_name):
         personas: Dict[str, Persona] which maps artist names to personas
     """
     personas = {}
-    with open(persona_file_name) as persona_file:
+    with open(persona_file_name, 'r') as persona_file:
 
         if persona_file_name.endswith("csv"):
             csv_reader = csv.reader(persona_file, delimiter=",")
@@ -115,18 +115,21 @@ def create_personas(persona_file_name):
                 line_count += 1
         else:
             personas = json.load(persona_file_name)
+            for k, v in personas.items():
+                personas[k] = Persona.from_json(v)
     return personas
 
 
 def save_personas(save_file_name, personas):
-    json.dump(personas, save_file_name, cls=PersonaEncoder)
+    with open(save_file_name, 'w') as save_file:
+        json.dump(personas, save_file, cls=PersonaEncoder)
 
 
 def main():
     args = _parse_args()
     personas = create_personas(args.persona_data)
     if args.save_persona:
-        save_personas(args.save_persona, personas)
+        save_personas(args.save_data, personas)
     return personas
 
 
