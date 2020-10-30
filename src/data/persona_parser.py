@@ -82,7 +82,7 @@ class Persona:
     ):
         res = ["<name>", self.name]
         if use_rn and not self.real_name == "":
-            res.append("<real name>")
+            res.append("<realname>")
             res.append(self.real_name)
         if use_city and not self.city == "":
             res.append("<city>")
@@ -145,7 +145,7 @@ def create_personas(persona_file_name):
                     personas[persona.name] = persona
                 line_count += 1
         else:
-            personas = json.load(persona_file_name)
+            personas = json.load(persona_file)
             for k, v in personas.items():
                 personas[k] = Persona.from_json(v)
     return personas
