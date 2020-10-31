@@ -69,6 +69,7 @@ class Persona:
         persona.year = line[4]
         persona.group = line[5]
         persona.discog = line[6]
+        persona.id = line[7]
         return persona
 
     def to_nn_input(
@@ -80,7 +81,7 @@ class Persona:
         use_discog=True,
         use_year=True,
     ):
-        res = ["<name>", self.name]
+        res = ["<name>", self.name, "<id>", self.id]
         if use_rn and not self.real_name == "":
             res.append("<realname>")
             res.append(self.real_name)
@@ -110,19 +111,19 @@ class Persona:
         use_discog=True,
         use_year=True,
     ):
-        res = ["I am {}.".format(self.name)]
+        res = ["i am {}".format(self.name)]
         if use_rn and not self.real_name == "":
-            res.append("My real name is {}.".format(self.real_name))
+            res.append("my real name is {}".format(self.real_name))
         if use_city and not self.city == "":
-            res.append("I come from {}.".format(self.city))
+            res.append("i come from {}".format(self.city))
         if use_nn and not self.nicknames == "":
-            res.append("I am also known as {}.".format(self.nicknames))
+            res.append("i am also known as {}".format(self.nicknames))
         if use_group and not self.group == "":
-            res.append("I have been a part of groups like {}.".format(self.group))
+            res.append("i have been a part of groups like {}".format(self.group))
         if use_discog and not self.discog == "":
-            res.append("I have released albums such as {}.".format(self.discog))
+            res.append("i have released albums such as {}".format(self.discog))
         if use_year and not self.year == "":
-            res.append("I have been rapping since {}.".format(self.year))
+            res.append("i have been rapping since {}".format(self.year))
         return " ".join(res)
 
 def create_personas(persona_file_name):
