@@ -8,6 +8,7 @@ src/dataset/cleaned_verses_no_artists
 src/dataset/cleaned_raw_lyrics
 src/dataset/marked_verses
 src/dataset/TEST_marked_verses
+src/dataset/verses_with_tokens
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
