@@ -1,0 +1,6 @@
+[submodule "src/subword-nmt"]
+	path = src/dataset/subword-nmt
+	url = https://github.com/billyang98/subword-nmt.git
+[submodule "src/dataset/subword-nmt"]
+	path = src/dataset/subword_nmt
+	url = https://github.com/billyang98/subword-nmt.git
