@@ -133,3 +133,5 @@ dmypy.json
 
 # Secrets
 secrets.txt
+*/data/songs/*
+*.tgz
