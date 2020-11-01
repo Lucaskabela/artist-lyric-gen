@@ -1,3 +1,14 @@
+# Dataset files - specific to this project
+src/dataset/RAW_SONGS_DONT_DELETE
+src/dataset/raw_artist_lyrics_DONT_DELETE
+src/dataset/raw_verse_songs
+src/dataset/verses_with_artists
+src/dataset/filtered_songs
+src/dataset/cleaned_verses_no_artists
+src/dataset/cleaned_raw_lyrics
+src/dataset/marked_verses
+src/dataset/TEST_marked_verses
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -135,3 +146,4 @@ dmypy.json
 secrets.txt
 */data/songs/*
 *.tgz
+*.DS_STORE
