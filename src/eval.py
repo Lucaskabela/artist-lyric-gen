@@ -2,20 +2,14 @@ from nltk.translate.bleu_score import corpus_bleu
 from nltk.util import ngrams
 from transformers import AutoTokenizer, AutoModelWithLMHead
 # pip install transformers
-#pip install pronouncing
+# pip install pronouncing
 
-
-# For generation, can just use reference and 
-def sel_bleu_gen(artist_list, generated):
-    """
-    artist list is list[str], name of artist
-    generated is list[list[str]], list of generated lines
-    """
-
+# Self -bleu measures diversity between verse
+# Distinct-n measures diversity in a verse
 
 def sel_bleu_artist(artist_corpus):
     '''
-    Corpus is a list[list[str]], which is a list of lines.  Use to compute self-bleu
+    Corpus is a list[list[str]], which is a list of verses.  Use to compute self-bleu
     '''
     total = 0
     list_of_references = []
@@ -28,41 +22,60 @@ def sel_bleu_artist(artist_corpus):
 def sel_bleu_artist_avg(dataset):
     """
     dataset is a list[list[list[str]]], or a list of artist_corpus
+    Returns per-artist self-bleu and dataset average
     """
     dataset_bleu = [sel_bleu_artist(artist) for artist in dataset]
-    return sum(dataset_bleu) / len(dataset)
+    return dataset_bleu, sum(dataset_bleu) / len(dataset)
 
 
 
-def distinct_n_sentence(sentence, n=1):
+def distinct_n_verse(verse, n=1):
     """
-    Should we define on the verse level instead?
+    Calculates distinct n grams in a verse
+    Verse should be list[str]
     """
-    if len(sentence) == 0:
+    if len(verse) == 0:
         return 0.0  # Prevent a zero division
-    distinct_ngrams = set(ngrams(sentence, n))
-    return len(distinct_ngrams) / len(sentence)
+    distinct_ngrams = set(ngrams(verse, n))
+    return len(distinct_ngrams) / len(verse)
+
+def distinct_n_artist(artist_corpus, n=1):
+    """
+    Corpus is list[list[str]], or a list of verses
+    Returns average distinct-n for an artist
+    """
+
+    verses_d = [distinct_n_sentence(verse, n) for verse in artist_corpus]
+    return sum(verses_d) / len(artist_corpus)
 
 def distinct_n(corpus, n=1):
-    sent_d = [distinct_n_sentence(sentence, n) for sentence in corpus]
-    return sum(sent_d) / len(sentences)
-
-
-def perplexity(corpus):
     """
-    Returns the average perplexity of a corpus using gpt2 as LM
+    Corpus is list[list[list[str]]], or a list of artist-verses
+    Returns list of artist distinct-n and average 
     """
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    model = AutoModelWithLMHead.from_pretrained("gpt2")
-    model.eval()
+    artist_d = [distinct_n_artist(artist, n) for artist in corpus]
+    return artist_d, sum(artist_d) / len(corpus)
+
+def perplexity_artist(artist_corpus, tokenizer, model):
+    """
+    Returns the average perplexity of a artist-corpus using gpt2 as LM
+    """
     ppls = []
-    for sentence in corpus:
-        tokenize_input = tokenizer.tokenize(sentence)
+    for verse in artist_corpus:
+        tokenize_input = tokenizer.tokenize(verse)
         tensor_input = torch.tensor([tokenizer.convert_tokens_to_ids(tokenize_input)])
         loss=model(tensor_input, lm_labels=tensor_input)
         ppls.append(math.exp(loss))
     return sum(ppls) / len(ppls)
 
+def perplexity(corpus):
+    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    model = AutoModelWithLMHead.from_pretrained("gpt2")
+    model.eval()
+    artist_ppls = []
+    for artist in corpus:
+        artist_ppls.append(perplexity_artist(artist, tokenizer, model))
+    return artist_ppls, sum(artist_ppls)/len(artist_ppls)
 
 # TODO: Decide if this actually computes rhyme density, 
 
