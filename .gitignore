@@ -9,6 +9,8 @@ src/dataset/cleaned_raw_lyrics
 src/dataset/marked_verses
 src/dataset/TEST_marked_verses
 src/dataset/verses_with_tokens
+src/dataset/bpe_songs*
+src/dataset/untracked_data_files
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
