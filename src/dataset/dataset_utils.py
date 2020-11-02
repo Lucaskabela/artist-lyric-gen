@@ -160,3 +160,5 @@ def apply_bpe_to_string(s, bpe=None, codes_file_path=None):
         bpe = get_bpe_object(codes_file_path)
     return bpe.process_line(s)
 
+def revert_bpe(s):
+    return re.sub(r'(@@ )|(@@ ?$)', '', s)
