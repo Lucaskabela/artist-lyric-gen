@@ -58,7 +58,7 @@ def loop_and_process(
     print("{} for {} {}".format(time_taken, len(objects), item_type_name))
 
 def read_list_from_file(list_path):
-    with open(list_path) as listfile:
+    with open(list_path, encoding="utf-8") as listfile:
         l = listfile.readlines()
     return [i.strip() for i in l]
 

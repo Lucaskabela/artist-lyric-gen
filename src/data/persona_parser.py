@@ -157,20 +157,23 @@ def save_personas(save_file_name, personas):
         json.dump(personas, save_file, cls=PersonaEncoder)
 
 def save_personas_txt(save_file_name, personas, natural=False):
+    lengths = []
     with open(save_file_name, 'w') as save_file:
         for persona in personas.values():
             written_descrip = persona.to_nn_input()
             if natural:
                 written_descrip = persona.to_natural_input()
+            lengths.append(len(written_descrip.split(" ")))
             save_file.write("".join([written_descrip, "\n"]))
-
+    return lengths, sum(lengths)/len(lengths
+    )
 def main():
     args = _parse_args()
     personas = create_personas(args.persona_data)
     if args.save_persona_json:
         save_personas(args.save_json_data, personas)
     if args.save_persona:
-        save_personas_txt(args.save_persona_txt, personas, args.natural)
+        stats = save_personas_txt(args.save_persona_txt, personas, args.natural)
     return personas
 
 
