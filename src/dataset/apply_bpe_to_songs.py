@@ -1,6 +1,5 @@
 from subword_nmt import apply_bpe
 import json
-import codecs
 from dataset_utils import loop_and_process, name_to_file_name, read_list_from_file, write_list_to_file, remove_duplicates_from_list_file, clean_artist_names, get_bpe_object, apply_bpe_to_string
 from fix_tokens import verses_with_tokens
 
