@@ -152,6 +152,7 @@ def clean_artist_names(s):
 def get_bpe_object(codes_file_path):
     codes = codecs.open(codes_file_path, encoding='utf-8')
     bpe = apply_bpe.BPE(codes)
+    codes.close()
     return bpe
 
 def apply_bpe_to_string(s, bpe=None, codes_file_path=None):
