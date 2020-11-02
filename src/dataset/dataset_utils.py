@@ -4,6 +4,8 @@ import time
 import re
 import traceback
 import unidecode
+import codecs
+from subword_nmt import apply_bpe
 from tqdm import tqdm
 
 def name_to_file_name(name):
@@ -146,3 +148,15 @@ def clean_artist_names(s):
     s = re.sub(r"wiz khalfia", "wiz khalifa", s)
     s = remove_special_characters(s)
     return s
+
+def get_bpe_object(codes_file_path):
+    codes = codecs.open(codes_file_path, encoding='utf-8')
+    bpe = apply_bpe.BPE(codes)
+    return bpe
+
+def apply_bpe_to_string(s, bpe=None, codes_file_path=None):
+    assert bpe is not None or codes_file_path is not None
+    if bpe is None:
+        bpe = get_bpe_object(codes_file_path)
+    return bpe.process_line(s)
+
