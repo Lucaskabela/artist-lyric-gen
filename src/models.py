@@ -93,45 +93,68 @@ class CVAE(BaseNetwork):
         nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
         self.dropout = nn.Dropout(p=drop)
 
-        # self.c_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True)
-        self.x_encoder = nn.LSTM(
+        # X and P will be encoded then concatenated
+        self.x_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
+        self.p_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
+
+        self.y_encoder = nn.LSTM(
             emb_dim, hidden_size, bidirectional=True, batch_first=True
         )
+
         self.recognition = nn.Linear(hidden_size * 2, hidden_size * 2)
-        self.mu = nn.Linear(hidden_size * 2, latent_dim)
-        self.log_var = nn.Linear(hidden_size * 2, latent_dim)
+        self.r_mu = nn.Linear(hidden_size * 2, latent_dim)
+        self.r_log_var = nn.Linear(hidden_size * 2, latent_dim)
+
+        self.prior = nn.Linear(hidden_size * 4, hidden_size * 4)
+        self.p_mu = nn.Linear(hidden_size * 4, latent_dim)
+        self.p_log_var = nn.Linear(hidden_size * 4, latent_dim)
 
         # Make this latent + hidden (?)
         self.latent2hidden = nn.Linear(latent_dim, hidden_size)
         self.decoder = nn.LSTM(emb_dim, hidden_size, batch_first=True)
         self.out = nn.Linear(hidden_size, self.vocab_size)
 
-    def encode(self, x_emb, x_length, c):  # Produce Q(z | x, c)
+    def encode(self, x_emb, x_length, p_emb, p_length, y_emb, y_length):  # Produce Q(z | x, y, p)
         """
         x: (seq_len, batch_size)
         c: (batch_size, class_size (?))
         """
-        # Cat x, c and encode
-        # Embed x, c
-        sorted_lengths, sorted_idx = torch.sort(x_length, descending=True)
-        x_emb = x_emb[sorted_idx]
-
-        # c_h, (c_hn, c_cn) = self.c_encoder(c)
-
-        # Turn x to (seq_len, batch_size, emb_dim)
+        # For efficency, sort and pack x, then encode!
+        sorted_x_lengths, sorted_x_idx = torch.sort(x_length, descending=True)
+        x_emb = x_emb[sorted_x_idx]
         packed_x = pack_padded_sequence(
-            x_emb, sorted_lengths.data.tolist(), batch_first=True
+            x_emb, sorted_x_lengths.data.tolist(), batch_first=True
         )
-
         x_h, (x_hn, x_cn) = self.x_encoder(packed_x)
-
         x_enc = torch.cat([x_hn[0], x_hn[1]], dim=-1)
-        # c_enc = torch.cat([c_hn[0], c_hn[1]])
-        # hidden_in = torch.cat([x_enc, c_enc], dim=-1)
+
+        # For efficency, sort and pack p, then encode!
+        sorted_p_lengths, sorted_p_idx = torch.sort(p_length, descending=True)
+        p_emb = p_emb[sorted_p_idx]
+        packed_p = pack_padded_sequence(
+            p_emb, sorted_p_lengths.data.tolist(), batch_first=True
+        )
+        p_h, (p_hn, p_cn) = self.p_encoder(packed_p)
+        p_enc = torch.cat([p_hn[0], p_hn[1]], dim=-1)
+
+
+        # For efficency, sort and pack y, then encode!
+        sorted_y_lengths, sorted_y_idx = torch.sort(y_length, descending=True)
+        y_emb = y_emb[sorted_y_idx]
+        packed_y = pack_padded_sequence(
+            y_emb, sorted_y_lengths.data.tolist(), batch_first=True
+        )
+        y_h, (y_hn, y_cn) = self.y_encoder(packed_y)
+        y_enc = torch.cat([y_hn[0], y_hn[1]], dim=-1)
+
+        c_enc = torch.cat([x_enc, p_enc], dim=-1)
+
         hidden_in = x_enc
         out_rec = F.elu(self.recognition(hidden_in))
-        mu, log_var = self.mu(out_rec), self.log_var(out_rec)
-        return mu, log_var
+        out_p = F.elu(self.prior(c_enc))
+        r_mu, r_log_var = self.r_mu(out_rec), self.r_log_var(out_rec)
+        p_mu, p_log_var = self.p_mu(out_rec), self.p_log_var(out_rec)
+        return r_mu, r_log_var, p_mu, p_log_var, c_enc
 
     def reparameterize(self, mu, log_var):
         """
@@ -141,22 +164,22 @@ class CVAE(BaseNetwork):
         eps = torch.randn_like(std)
         return mu + eps * std
 
-    def decode(self, x, x_lens, z, c):  # Produce P(x | z, c)
+    def decode(self, y, y_lens, z, c):  # Produce P(x | z, c)
         """
         z: (batch_size, latent_size (?))
         c: (batch_size, class_size (?))
         """
         # to_decode = torch.cat([z, c], dim=-1)
-        to_decode = z
+        to_decode = torch.cat([z, c], dim=-1)
 
-        x_lengths = torch.LongTensor([x + 1 for x in x_lens]).to(self.device())
-        sorted_lengths, sorted_idx = torch.sort(x_lengths, descending=True)
-        x = x[sorted_idx]
-        packed_x = pack_padded_sequence(
-            x, sorted_lengths.data.tolist(), batch_first=True
+        y_lengths = torch.LongTensor([y + 1 for y in y_lens]).to(self.device())
+        sorted_lengths, sorted_idx = torch.sort(y_lengths, descending=True)
+        y = y[sorted_idx]
+        packed_y = pack_padded_sequence(
+            y, sorted_lengths.data.tolist(), batch_first=True
         )
 
-        output, hidden = self.decoder(packed_x, to_decode)
+        output, hidden = self.decoder(packed_y, to_decode)
 
         # Unpack and then return to original order
         padded_outputs = pad_packed_sequence(output, batch_first=True)[0]
@@ -167,15 +190,18 @@ class CVAE(BaseNetwork):
         output = F.log_softmax(self.out(padded_outputs), dim=-1)
         return output
 
-    def forward(self, x, x_lengths, c):
+    def forward(self, x, x_lengths, p, p_lengths, y, y_lengths):
 
         # Embed the padded input
         x_emb = self.dropout(self.embedding(x))
+        p_emb = self.dropout(self.embedding(p))
+        y_emb = self.dropout(self.embedding(y))
 
-        mu, log_var = self.encode(x_emb, x_lengths, c)
+        params = self.encode(x_emb, x_lengths, p_emb, p_lengths, p_emb, p_lengths)
+        r_mu, r_log_var, p_mu, p_log_var, c = params
 
         # Handle formatting the latent properly for LSTM
-        z = self.reparameterize(mu, log_var)
+        z = self.reparameterize(r_mu, r_log_var)
         hidden = self.latent2hidden(z)
         hidden = (hidden.unsqueeze(0), hidden.unsqueeze(0))
 
@@ -183,7 +209,7 @@ class CVAE(BaseNetwork):
         SOS = torch.ones(x.shape[0], 1).long().to(self.device())
         SOS = self.dropout(self.embedding(SOS))
 
-        teacher_force = torch.cat([SOS, x_emb], dim=1)
-        out_seq = self.decode(teacher_force, x_lengths, hidden, c)
+        teacher_force = torch.cat([SOS, y_emb], dim=1)
+        out_seq = self.decode(teacher_force, y_lengths, hidden, c)
 
-        return out_seq, mu, log_var
+        return out_seq, r_mu, r_log_var, p_mu, p_log_var
