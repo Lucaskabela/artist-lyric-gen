@@ -19,8 +19,8 @@ See setup.sh to get started and install requirements for the project
  - [x] Fill in Boilerplate code
  - [x] Get Genius api token and try it out
  - [x] Scope out future work for project
- - [ ] Collect data from Genius
+ - [x] Collect data from Genius
  - [ ] Write BART baseline
  - [ ] Write GhostWriter LSTM baseline (?)
  - [ ] Implement CVAE
- - [ ] Evaluation Code
+ - [x] Evaluation Code
