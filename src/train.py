@@ -49,6 +49,7 @@ def init_logger(log_dir=None):
 
 def eval_inference(model, corpus, valid_log, global_step):
     max_len = 30
+    # Change to sample context from test and use this to generate / condition
     model.eval()
     exs = []
     for i in range(4):
@@ -94,6 +95,8 @@ def train(args):
     vocab = len(corpus.dictionary)
     model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+    scheduler = MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
+
     if args.continue_training:
         model.load_model()
     model = model.to(device)
@@ -113,9 +116,9 @@ def train(args):
             y, y_len = y.to(device), y_len.to(device)
             res = model(x, x_len, p, p_len, y, y_len)
             pred, r_mu, r_log_var, p_mu, p_log_var = res
-            eos_tensor = torch.empty(x.shape[0], 1).to(device)
+            eos_tensor = torch.empty(y.shape[0], 1).to(device)
             eos_tensor.fill_(corpus.dictionary.word2idx["<eos>"])
-            gold = torch.cat([x, eos_tensor], dim=1).long()
+            gold = torch.cat([y, eos_tensor], dim=1).long()
             alph = min(max(0, (global_step - 10_000) / 60_000), 1)
             pred = pred.permute(0, 2, 1)
             # Get loss, normalized by batch size
@@ -127,6 +130,7 @@ def train(args):
             if args.grad_clip > 0.0:
                 nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
             optimizer.step()
+            scheduler.step()
             global_step += 1
 
             losses.append(loss_val.detach().cpu().numpy())

@@ -36,21 +36,26 @@ class Corpus(object):
 
     def __init__(self, path):
         self.dictionary = Dictionary()
+        # Get and add personas, as well as tokenize the personas
         self.train = self.tokenize(os.path.join(path, "train.txt"))
         self.valid = self.tokenize(os.path.join(path, "valid.txt"))
         self.test = self.tokenize(os.path.join(path, "test.txt"))
 
-    def tokenize(self, path):
+    def tokenize(self, path, max_context=100):
         """Tokenizes a text file."""
         assert os.path.exists(path)
         # Add words to the dictionary
         with open(path, "r", encoding="utf8") as f:
-            for line in f:
+            lyrics = json.load(f)
+            prev_line = ""
+            for verse in lyrics:
                 words = line.split() + ["<eos>"]
                 for word in words:
                     self.dictionary.add_word(word)
 
         # Tokenize file content
+        # Should be tuple (previous lines, persona, current line)
+        # Might consider limiting pervious lines/size too!
         with open(path, "r", encoding="utf8") as f:
             idss = []
             for line in f:
@@ -60,14 +65,14 @@ class Corpus(object):
                     for word in words:
                         ids.append(self.dictionary.word2idx[word])
                     idss.append(torch.tensor(ids).type(torch.long))
+        # Do not return idss, return the datasets instead!
         return idss
 
 
 # Should return something we can get batches from - dataloader?
-def load_data(dataset, batch_size=256, num_workers=2):
-    dat = SentDataset(dataset)
+def load_data(dataset, batch_size=256, num_workers=1):
     return DataLoader(
-        dat,
+        dataset,
         batch_size=batch_size,
         num_workers=num_workers,
         shuffle=True,
@@ -75,24 +80,33 @@ def load_data(dataset, batch_size=256, num_workers=2):
     )
 
 
-class SentDataset(Dataset):
+class RapPersonaDataset(Dataset):
     """
-    A dataset containing target sentences - just used for batching
-    and sampling.  There is no target (for training reconstruction)
+    A dataset containing target sentences, previous lines, and personas
+    There is no target (for training reconstruction loss)
     """
 
-    def __init__(self, sents):
+    def __init__(self, persona_idxs, personas, prev, sents):
+        self.persona_idxs = persona_idxs
+        self.personas = personas
+        self.prev = prev
         self.sents = sents
 
     def __len__(self):
         return len(self.sents)
 
     def __getitem__(self, index):
-        return self.sents[index]
+        persona =  self.personas[self.persona_idxs[index]]
+        return self.prev[index], persona, self.sents[index]
 
 
 # a simple custom collate function, just put them into a list!
 def collate_pad_sentences(batch):
-    batch_lens = torch.LongTensor([len(x) for x in batch])
-    batch_pad = pad_sequence(batch, batch_first=True, padding_value=0)
-    return batch_pad, batch_lens
+    prev, persona, line = batch
+    prev_lens = torch.LongTensor([len(x) for x in prev])
+    prev_pad = pad_sequence(prev, batch_first=True, padding_value=0)
+    persona_lens = torch.LongTensor([len(x) for x in persona])
+    persona_pad = pad_sequence(persona, batch_first=True, padding_value=0)
+    batch_lens = torch.LongTensor([len(x) for x in line])
+    batch_pad = pad_sequence(line, batch_first=True, padding_value=0)
+    return prev_pad, prev_lens, persona_pad, persona_lens, batch_pad, batch_lens
