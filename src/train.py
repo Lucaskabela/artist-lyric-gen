@@ -13,15 +13,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.tensorboard as tb
 
-
-def vae_loss_function(x_p, x, mu, log_var, alpha=0):
+def vae_loss_function(x_p, x, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
     """
     Loss for CVAE is BCE + KLD
         see Appendix B from Kingma and Welling 2014
     Need alpha for KL annealing
     """
+    recog = torch.distributions.normal.Normal(r_mu, r_log_var)
+    prior = torch.distributions.normal.Normal(p_mu, p_log_var)
     BCE = F.nll_loss(x_p, x, reduction="sum", ignore_index=0)
-    KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+    KLD = -F.kl_div(recog, prior)
     return BCE + alpha * KLD
 
 
@@ -105,17 +106,20 @@ def train(args):
 
         model.train()
         losses = []
-        for x, x_len in train_data:
+        for x, x_len, p, p_len, y, y_len in train_data:
             # Now we need to make sure everything in the batch has same size
             x, x_len = x.to(device), x_len.to(device)
-            pred, mu, log_var = model(x, x_len, None)
+            p, p_len = p.to(device), p_len.to(device)
+            y, y_len = y.to(device), y_len.to(device)
+            res = model(x, x_len, p, p_len, y, y_len)
+            pred, r_mu, r_log_var, p_mu, p_log_var = res
             eos_tensor = torch.empty(x.shape[0], 1).to(device)
             eos_tensor.fill_(corpus.dictionary.word2idx["<eos>"])
             gold = torch.cat([x, eos_tensor], dim=1).long()
             alph = min(max(0, (global_step - 10_000) / 60_000), 1)
             pred = pred.permute(0, 2, 1)
             # Get loss, normalized by batch size
-            loss_val = loss(pred, gold, mu, log_var, alpha=alph)
+            loss_val = loss(pred, gold, r_mu, r_log_var, p_mu, p_log_var, alpha=alph)
             loss_val /= args.batch_size
 
             optimizer.zero_grad()
