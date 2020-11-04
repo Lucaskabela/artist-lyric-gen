@@ -165,8 +165,8 @@ def save_personas_txt(save_file_name, personas, natural=False):
                 written_descrip = persona.to_natural_input()
             lengths.append(len(written_descrip.split(" ")))
             save_file.write("".join([written_descrip, "\n"]))
-    return lengths, sum(lengths)/len(lengths
-    )
+    return lengths, sum(lengths)/len(lengths)
+     
 def main():
     args = _parse_args()
     personas = create_personas(args.persona_data)

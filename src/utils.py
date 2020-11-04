@@ -5,12 +5,12 @@ import torch
 from collections import Counter
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
-
+from data.persona_parser import create_personas
 
 class Dictionary(object):
     def __init__(self):
-        self.word2idx = {"<pad>": 0, "<sos>": 1, "<eos>": 2, "<unk>": 3}
-        self.idx2word = ["<pad>", "<sos>", "<eos>", "<unk>"]
+        self.word2idx = {"<pad>": 0, "S": 1, "L": 2, "<unk>": 3}
+        self.idx2word = ["<pad>", "S", "L", "<unk>"]
         self.counter = Counter()
         self.total = 0
 
@@ -34,39 +34,72 @@ class Corpus(object):
     dimensions.  Use these later to batch
     """
 
-    def __init__(self, path):
+    def __init__(self, path, persona_path):
         self.dictionary = Dictionary()
         # Get and add personas, as well as tokenize the personas
+        self.personas = self.tokenize_p(create_personas(persona_path))
         self.train = self.tokenize(os.path.join(path, "train.txt"))
         self.valid = self.tokenize(os.path.join(path, "valid.txt"))
         self.test = self.tokenize(os.path.join(path, "test.txt"))
+
+    def tokenize_p(self, personas):
+        natural = False
+        res = {}
+        for name in personas:
+            person = personas[name]
+            
+            if natural:
+                fn = person.to_natural_input
+            else:
+                fn = person.to_nn_input
+            persona_text = fn(use_rn=True, use_city=True, use_nn=True, use_group=True, use_discog=True, use_year=True)
+            # !!!! persona_text.to_bpe
+            words = persona_text.split()
+            for word in words:
+                self.dictionary.add_word(word)
+            idxs = []
+            for word in words:
+                idxs.append(self.dictionary.word2idx[word])
+            res[person.id] = idxs
+        return res
 
     def tokenize(self, path, max_context=100):
         """Tokenizes a text file."""
         assert os.path.exists(path)
         # Add words to the dictionary
         with open(path, "r", encoding="utf8") as f:
-            lyrics = json.load(f)
-            prev_line = ""
-            for verse in lyrics:
-                words = line.split() + ["<eos>"]
-                for word in words:
-                    self.dictionary.add_word(word)
+            songs = json.load(f)
+            for verse in songs:
+                lyrics = verse["lyrics"].split("L")
+                for line in lyrics:
+                    # Get each line in the song
+                    words = line.split() + "L"
+                    for word in words:
+                        self.dictionary.add_word(word)
 
         # Tokenize file content
-        # Should be tuple (previous lines, persona, current line)
-        # Might consider limiting pervious lines/size too!
         with open(path, "r", encoding="utf8") as f:
-            idss = []
-            for line in f:
-                words = line.split() + ["<eos>"]
-                if len(words) > 1:
+            x_s = []
+            personas = []
+            y_s = []
+            songs = json.load(f)
+            for song in songs:
+                artist = song["artist_id"]
+                artist_persona = self.personas[artist]
+                verse = song["lyrics"].split("L")
+                context = []
+                for line in verse:
+                    words = line.split() + "L"
                     ids = []
                     for word in words:
                         ids.append(self.dictionary.word2idx[word])
-                    idss.append(torch.tensor(ids).type(torch.long))
+                    x_s.append(torch.tensor(context[-max_context]).long())
+                    personas.append(torch.tensor(artist_persona).long())
+                    y_s.append(torch.tensor(ids).type(torch.long))
+                    # Do not append start of sequence to context
+                    context.extend(ids[1:])
         # Do not return idss, return the datasets instead!
-        return idss
+        return RapPersonaDataset(x_s, personas, y_s)
 
 
 # Should return something we can get batches from - dataloader?
@@ -86,18 +119,18 @@ class RapPersonaDataset(Dataset):
     There is no target (for training reconstruction loss)
     """
 
-    def __init__(self, persona_idxs, personas, prev, sents):
-        self.persona_idxs = persona_idxs
-        self.personas = personas
+    def __init__(self, prev, personas, sents):
         self.prev = prev
+        self.personas = personas
         self.sents = sents
+        assert len(self.prev) == len(self.sents)
+        assert len(self.personas) == len(self.sents)
 
     def __len__(self):
         return len(self.sents)
 
     def __getitem__(self, index):
-        persona =  self.personas[self.persona_idxs[index]]
-        return self.prev[index], persona, self.sents[index]
+        return self.prev[index], self.persona[index], self.sents[index]
 
 
 # a simple custom collate function, just put them into a list!

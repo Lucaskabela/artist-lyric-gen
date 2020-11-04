@@ -149,7 +149,8 @@ class CVAE(BaseNetwork):
 
         c_enc = torch.cat([x_enc, p_enc], dim=-1)
 
-        hidden_in = x_enc
+        # Should I concatenate context here too?
+        hidden_in = torch.cat([y_enc, c_enc], dim=-1)
         out_rec = F.elu(self.recognition(hidden_in))
         out_p = F.elu(self.prior(c_enc))
         r_mu, r_log_var = self.r_mu(out_rec), self.r_log_var(out_rec)
@@ -172,7 +173,7 @@ class CVAE(BaseNetwork):
         # to_decode = torch.cat([z, c], dim=-1)
         to_decode = torch.cat([z, c], dim=-1)
 
-        y_lengths = torch.LongTensor([y + 1 for y in y_lens]).to(self.device())
+        y_lengths = torch.LongTensor(y_lens).to(self.device())
         sorted_lengths, sorted_idx = torch.sort(y_lengths, descending=True)
         y = y[sorted_idx]
         packed_y = pack_padded_sequence(
@@ -196,8 +197,7 @@ class CVAE(BaseNetwork):
         x_emb = self.dropout(self.embedding(x))
         p_emb = self.dropout(self.embedding(p))
         y_emb = self.dropout(self.embedding(y))
-
-        params = self.encode(x_emb, x_lengths, p_emb, p_lengths, p_emb, p_lengths)
+        params = self.encode(x_emb, x_lengths, p_emb, p_lengths, y_emb[1:, :, :], y_lengths)
         r_mu, r_log_var, p_mu, p_log_var, c = params
 
         # Handle formatting the latent properly for LSTM
@@ -206,10 +206,10 @@ class CVAE(BaseNetwork):
         hidden = (hidden.unsqueeze(0), hidden.unsqueeze(0))
 
         # Teacher forcing here - Preppend SOS token
-        SOS = torch.ones(x.shape[0], 1).long().to(self.device())
-        SOS = self.dropout(self.embedding(SOS))
+        # SOS = torch.ones(x.shape[0], 1).long().to(self.device())
+        # SOS = self.dropout(self.embedding(SOS))
 
-        teacher_force = torch.cat([SOS, y_emb], dim=1)
+        teacher_force = y_emb[:,:,:-1]
         out_seq = self.decode(teacher_force, y_lengths, hidden, c)
 
         return out_seq, r_mu, r_log_var, p_mu, p_log_var
