@@ -96,7 +96,7 @@ def train(args):
     vocab = len(corpus.dictionary)
     model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
-    scheduler = MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
 
     if args.continue_training:
         model.load_model()
@@ -115,7 +115,10 @@ def train(args):
             y, y_len = y.to(device), y_len.to(device)
             res = model(x, x_len, p, p_len, y, y_len)
             pred, r_mu, r_log_var, p_mu, p_log_var = res
-            gold = y[:, :, 1:]
+
+            eos_tensor = torch.empty(x.shape[0], 1).to(device)
+            eos_tensor.fill_(corpus.dictionary.word2idx["L"])
+            gold = torch.cat([y, eos_tensor], dim=1).long()
             alph = min(max(0, (global_step - 10_000) / 60_000), 1)
             pred = pred.permute(0, 2, 1)
             # Get loss, normalized by batch size

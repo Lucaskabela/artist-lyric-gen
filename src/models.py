@@ -197,7 +197,7 @@ class CVAE(BaseNetwork):
         x_emb = self.dropout(self.embedding(x))
         p_emb = self.dropout(self.embedding(p))
         y_emb = self.dropout(self.embedding(y))
-        params = self.encode(x_emb, x_lengths, p_emb, p_lengths, y_emb[1:, :, :], y_lengths)
+        params = self.encode(x_emb, x_lengths, p_emb, p_lengths, y_emb, y_lengths)
         r_mu, r_log_var, p_mu, p_log_var, c = params
 
         # Handle formatting the latent properly for LSTM
@@ -206,10 +206,10 @@ class CVAE(BaseNetwork):
         hidden = (hidden.unsqueeze(0), hidden.unsqueeze(0))
 
         # Teacher forcing here - Preppend SOS token
-        # SOS = torch.ones(x.shape[0], 1).long().to(self.device())
-        # SOS = self.dropout(self.embedding(SOS))
+        SOS = torch.ones(y.shape[0], 1).long().to(self.device())
+        SOS = self.dropout(self.embedding(SOS))
 
-        teacher_force = y_emb[:,:,:-1]
+        teacher_force = torch.cat([SOS, y_emb], dim=1)
         out_seq = self.decode(teacher_force, y_lengths, hidden, c)
 
         return out_seq, r_mu, r_log_var, p_mu, p_log_var
