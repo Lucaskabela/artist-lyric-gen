@@ -6,6 +6,7 @@ from collections import Counter
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
 from data.persona_parser import create_personas
+from dataset.dataset_utils import apply_bpe_to_string, get_bpe_object, clean_artist_names
 
 class Dictionary(object):
     def __init__(self):
@@ -37,10 +38,20 @@ class Corpus(object):
     def __init__(self, path, persona_path):
         self.dictionary = Dictionary()
         # Get and add personas, as well as tokenize the personas
-        self.personas = self.tokenize_p(create_personas(persona_path))
+        # self.bpe = get_bpe_object()
+        # self.personas = self.tokenize_p(create_personas(persona_path))
+        self.personas = self.tokenize_p_2(persona_path)
         self.train = self.tokenize(os.path.join(path, "train.json"))
         self.valid = self.tokenize(os.path.join(path, "valid.json"))
         self.test = self.tokenize(os.path.join(path, "test.json"))
+
+    def tokenize_p_2(self, personas_path):
+        res = {}
+        idx = 0
+        with open(personas_path, 'r') as personas:
+            for line in personas:
+                res[idx] = line
+        return res
 
     def tokenize_p(self, personas):
         natural = False
@@ -53,7 +64,8 @@ class Corpus(object):
             else:
                 fn = person.to_nn_input
             persona_text = fn(use_rn=True, use_city=True, use_nn=True, use_group=True, use_discog=True, use_year=True)
-            # !!!! persona_text.to_bpe
+            persona_text = clean_artist_names(persona_text)
+            persona_text = apply_bpe_to_string(persona_text, self.bpe)
             words = persona_text.split()
             for word in words:
                 self.dictionary.add_word(word)
