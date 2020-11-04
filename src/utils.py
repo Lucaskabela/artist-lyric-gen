@@ -1,12 +1,13 @@
 # Taken from
 # https://github.com/pytorch/examples/blob/master/word_language_model/data.py
+import json
 import os
 import torch
 from collections import Counter
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
-from data.persona_parser import create_personas
-from dataset.dataset_utils import apply_bpe_to_string, get_bpe_object, clean_artist_names
+# from data.persona_parser import create_personas
+# from dataset.dataset_utils import apply_bpe_to_string, get_bpe_object, clean_artist_names
 
 class Dictionary(object):
     def __init__(self):
@@ -42,15 +43,22 @@ class Corpus(object):
         # self.personas = self.tokenize_p(create_personas(persona_path))
         self.personas = self.tokenize_p_2(persona_path)
         self.train = self.tokenize(os.path.join(path, "train.json"))
-        self.valid = self.tokenize(os.path.join(path, "valid.json"))
+        self.valid = self.tokenize(os.path.join(path, "val.json"))
         self.test = self.tokenize(os.path.join(path, "test.json"))
 
     def tokenize_p_2(self, personas_path):
         res = {}
-        idx = 0
+        idx = 1
         with open(personas_path, 'r') as personas:
             for line in personas:
-                res[idx] = line
+                words = line.split()
+                for word in words:
+                    self.dictionary.add_word(word)
+                idxs = []
+                for word in words:
+                    idxs.append(self.dictionary.word2idx[word])
+                res[idx] = idxs
+                idx += 1
         return res
 
     def tokenize_p(self, personas):
@@ -85,7 +93,7 @@ class Corpus(object):
                 lyrics = verse["lyrics"].split("L")
                 for line in lyrics:
                     # Get each line in the song
-                    words = line.split() + "L"
+                    words = line.split() + ["L"]
                     for word in words:
                         self.dictionary.add_word(word)
 
@@ -99,13 +107,13 @@ class Corpus(object):
                 artist = song["artist_id"]
                 artist_persona = self.personas[artist]
                 verse = song["lyrics"].split("L")
-                context = []
+                context = [1] # Place holder, make song title
                 for line in verse:
-                    words = line.split() + "L"
+                    words = line.split()[1:] # Disregard start of line
                     ids = []
                     for word in words:
                         ids.append(self.dictionary.word2idx[word])
-                    x_s.append(torch.tensor(context[-max_context]).long())
+                    x_s.append(torch.tensor(context[-max_context:]).long())
                     personas.append(torch.tensor(artist_persona).long())
                     y_s.append(torch.tensor(ids).type(torch.long))
                     # Do not append start of sequence to context
@@ -142,7 +150,7 @@ class RapPersonaDataset(Dataset):
         return len(self.sents)
 
     def __getitem__(self, index):
-        return self.prev[index], self.persona[index], self.sents[index]
+        return self.prev[index], self.personas[index], self.sents[index]
 
 
 # a simple custom collate function, just put them into a list!
