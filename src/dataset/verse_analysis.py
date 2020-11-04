@@ -21,7 +21,7 @@ def update_artist(artists, artist_name, num_songs, num_verses, num_lines):
         artists[artist_name][2] = artists[artist_name][2] + num_lines
 
 def get_update_songs():
-    artists_list = read_list_from_file("cleaned_artist_names.txt")
+    artists_list = read_list_from_file("final_artist_list.txt")
     def update_songs(songs, song_title, artist_name, num_lines):
         # increment the count of a verse for an artist for a song
         artist_index = artists_list.index(artist_name)

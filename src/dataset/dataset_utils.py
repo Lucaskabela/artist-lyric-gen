@@ -4,6 +4,8 @@ import time
 import re
 import traceback
 import unidecode
+import codecs
+from subword_nmt import apply_bpe
 from tqdm import tqdm
 
 def name_to_file_name(name):
@@ -105,9 +107,59 @@ def remove_special_characters(s):
 def clean_artist_names(s):
     #TODO: get the way yo clean artist names
     s = s.lower()
-    s = re.sub(r"6ix9ine", "six nine", s)
-    s = re.sub(r"sixx-nine", "six nine", s)
-    s = re.sub(r"ty\$", "ty dolla sign", s)
-    s = re.sub(r"n9ne", "nine", s)
+    s = re.sub(r"six\-nine|sixx\-nine", "6ix9ine", s)
+    s = re.sub(r"^b\.ob\.", "b o b ", s)
+    s = re.sub(r"^daddy kane", "big daddy kane", s)
+    s = re.sub(r"busta rhyes|busta rymes|^busta$", "busta rhymes", s)
+    s = re.sub(r"chamilionaire|chamillionare", "chamillionaire", s)
+    s = re.sub(r"cheif keef", "chief keef", s)
+    s = re.sub(r"p diddy|p\. diddy|p\.diddy", "diddy", s)
+    s = re.sub(r"earl$", "earl sweatshirt", s)
+    s = re.sub(r"elzhi\'s \"ego\"", "elzhi ", s)
+    s = re.sub(r"fabulous|^fab$", "fabolous", s)
+    s = re.sub(r"french montanna|frenchmontana|^french$", "french montana", s)
+    s = re.sub(r"ghostace killah|ghostface$", "ghostface killah", s)
+    s = re.sub(r"inspector deck|inspektah deck", "inspectah deck", s)
+    s = re.sub(r"young jeezy", "jeezy", s)
+    s = re.sub(r"^kanye$|k\. west|kayne west", "kanye west", s)
+    s = re.sub(r"kendirck lamar|^kendrick$", "kendrick lamar", s)
+    s = re.sub(r"^kodak$", "kodak black", s)
+    s = re.sub(r"^krs$", "krs one", s)
+    s = re.sub(r"^g rap$", "kool g rap", s)
+    s = re.sub(r"lil wanye", "lil wayne", s)
+    s = re.sub(r"^ll$|l\.l\. cool j", "ll cool j", s)
+    s = re.sub(r"^luda$|ludracris", "ludacris", s)
+    s = re.sub(r"^lupe$", "lupe fiasco", s)
+    s = re.sub(r"masta ase|master ace", "masta ace", s)
+    s = re.sub(r"^meth$|method$", "method man", s)
+    s = re.sub(r"^doom$", "mf doom", s)
+    s = re.sub(r"missy$|missy eliott|missy elliot$", "missy elliott", s)
+    s = re.sub(r"nick minaj|^nicki$", "nicki minaj", s)
+    s = re.sub(r"^obie$", "obie trice", s)
+    s = re.sub(r"^r\.a$|ra the rugged man", "r a the rugged man", s)
+    s = re.sub(r"^royce$", "royce da 59", s)
+    s = re.sub(r"royce das", "royce da", s)
+    s = re.sub(r"^snoop$|snopp dogg|snoop lion|snoop doggy dogg", "snoop dogg", s)
+    s = re.sub(r"^t\.ii\.|^ti$", "t i ", s)
+    s = re.sub(r"talib$", "talib kweli", s)
+    s = re.sub(r"^tech$", "tech n9ne", s)
+    s = re.sub(r"the notorioui b\.i\.g\.|the notorioui b\.i\.g\.|^notorious b\.i\.g|^notorious b\.i\.g\.|notorious big", "the notorious b i g ", s)
+    s = re.sub(r"^vinnie$", "vinnie paz", s)
+    s = re.sub(r"wiz khalfia", "wiz khalifa", s)
     s = remove_special_characters(s)
     return s
+
+def get_bpe_object(codes_file_path):
+    codes = codecs.open(codes_file_path, encoding='utf-8')
+    bpe = apply_bpe.BPE(codes)
+    codes.close()
+    return bpe
+
+def apply_bpe_to_string(s, bpe=None, codes_file_path=None):
+    assert bpe is not None or codes_file_path is not None
+    if bpe is None:
+        bpe = get_bpe_object(codes_file_path)
+    return bpe.process_line(s)
+
+def revert_bpe(s):
+    return re.sub(r'(@@ )|(@@ ?$)', '', s)
