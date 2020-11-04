@@ -45,8 +45,12 @@ class Corpus(object):
         self.train = self.tokenize(os.path.join(path, "train.json"))
         self.valid = self.tokenize(os.path.join(path, "val.json"))
         self.test = self.tokenize(os.path.join(path, "test.json"))
+        print("Done loading")
 
     def tokenize_p_2(self, personas_path):
+        """
+        For loading from a bpe'd text file
+        """
         res = {}
         idx = 1
         with open(personas_path, 'r') as personas:
@@ -155,7 +159,9 @@ class RapPersonaDataset(Dataset):
 
 # a simple custom collate function, just put them into a list!
 def collate_pad_sentences(batch):
-    prev, persona, line = batch
+    prev = [b[0] for b in batch]
+    persona = [b[1] for b in batch]
+    line = [b[2] for b in batch]
     prev_lens = torch.LongTensor([len(x) for x in prev])
     prev_pad = pad_sequence(prev, batch_first=True, padding_value=0)
     persona_lens = torch.LongTensor([len(x) for x in persona])
