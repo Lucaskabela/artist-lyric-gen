@@ -38,9 +38,9 @@ class Corpus(object):
         self.dictionary = Dictionary()
         # Get and add personas, as well as tokenize the personas
         self.personas = self.tokenize_p(create_personas(persona_path))
-        self.train = self.tokenize(os.path.join(path, "train.txt"))
-        self.valid = self.tokenize(os.path.join(path, "valid.txt"))
-        self.test = self.tokenize(os.path.join(path, "test.txt"))
+        self.train = self.tokenize(os.path.join(path, "train.json"))
+        self.valid = self.tokenize(os.path.join(path, "valid.json"))
+        self.test = self.tokenize(os.path.join(path, "test.json"))
 
     def tokenize_p(self, personas):
         natural = False
