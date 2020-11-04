@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.tensorboard as tb
 
-def vae_loss_function(x_p, x, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
+def cvae_loss_function(x_p, x, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
     """
     Loss for CVAE is BCE + KLD
         see Appendix B from Kingma and Welling 2014
@@ -46,20 +46,20 @@ def init_logger(log_dir=None):
         valid_logger = tb.SummaryWriter(path.join(log_dir, "valid"))
     return train_logger, valid_logger
 
-
+# TODO: Fix eval_inference
 def eval_inference(model, corpus, valid_log, global_step):
     max_len = 30
     # Change to sample context from test and use this to generate / condition
     model.eval()
     exs = []
     for i in range(4):
-        out_sequence = ["<sos>"]
+        out_sequence = ["S"]
         z = torch.randn([1, model.latent_dim], device=model.device())
         z = model.latent2hidden(z)
         hidden = (z.unsqueeze(0), z.unsqueeze(0))
         # Teacher forcing here
         word = torch.ones([1, 1], dtype=torch.long, device=model.device())
-        while out_sequence[-1] != "<eos>" and len(out_sequence) < max_len:
+        while out_sequence[-1] != "L" and len(out_sequence) < max_len:
             word = model.embedding(word)
             outputs, hidden = model.decoder(word, hidden)
             outputs = F.log_softmax(model.out(outputs), dim=-1)
@@ -76,6 +76,7 @@ def eval_inference(model, corpus, valid_log, global_step):
         for i in range(len(exs)):
             name_ = "generated_example_{}".format(i)
             print(name_, exs[i])
+    model.train()
 
 
 def train(args):
@@ -87,10 +88,10 @@ def train(args):
     train_log, valid_log = init_logger(log_dir=args.log_dir)
 
     # TODO: set up load_data functions - be best if return a data loader
-    corpus = utils.Corpus(args.data)
+    corpus = utils.Corpus(args.data, args.persona_data)
     # This should return a dataloader or something to that effect
     train_data = utils.load_data(corpus.train, batch_size=args.batch_size)
-    # This should return a dataloader or something to that effect
+    test_data = utils.load_data(corpus.test, batch_size=args.batch_size)
 
     vocab = len(corpus.dictionary)
     model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
@@ -101,13 +102,11 @@ def train(args):
         model.load_model()
     model = model.to(device)
 
-    # TODO: Change the ignore_index to padding index
-    loss = vae_loss_function
+    loss = cvae_loss_function
 
     global_step = 0
     for epoch in range(args.num_epoch):
 
-        model.train()
         losses = []
         for x, x_len, p, p_len, y, y_len in train_data:
             # Now we need to make sure everything in the batch has same size
@@ -116,9 +115,7 @@ def train(args):
             y, y_len = y.to(device), y_len.to(device)
             res = model(x, x_len, p, p_len, y, y_len)
             pred, r_mu, r_log_var, p_mu, p_log_var = res
-            eos_tensor = torch.empty(y.shape[0], 1).to(device)
-            eos_tensor.fill_(corpus.dictionary.word2idx["<eos>"])
-            gold = torch.cat([y, eos_tensor], dim=1).long()
+            gold = y[:, :, 1:]
             alph = min(max(0, (global_step - 10_000) / 60_000), 1)
             pred = pred.permute(0, 2, 1)
             # Get loss, normalized by batch size
@@ -137,7 +134,7 @@ def train(args):
             if train_log is not None:
                 train_log.add_scalar("loss", losses[-1], global_step)
 
-        eval_inference(model, corpus, valid_log, global_step)
+        # eval_inference(model, corpus, valid_log, global_step)
         avg_l = np.mean(losses)
         print("epoch %-3d \t loss = %0.3f \t" % (epoch, avg_l))
         model.save_model()

@@ -45,6 +45,9 @@ def _parse_args():
     parser.add_argument(
         "--data", type=str, default="./data/wikitext2", help="Dir of dataset"
     )
+    parser.add_argument(
+        "--persona_data", type=str, default="./data/personas.json", help="Dir of dataset"
+    )
     parser.add_argument("--log_dir", type=str, default=None, help="Dir of tb")
     parser.add_argument("-n", "--num_epoch", type=int, default=50)
     parser.add_argument("-lr", "--learning_rate", type=float, default=1e-3)
