@@ -202,7 +202,7 @@ class CVAE(BaseNetwork):
 
         # Handle formatting the latent properly for LSTM
         z = self.reparameterize(r_mu, r_log_var)
-        hidden = self.latent2hidden(z).unsqueeze(0)
+        hidden = self.latent2hidden(z)
 
         # Teacher forcing here - Preppend SOS token
         SOS = torch.ones(y.shape[0], 1).long().to(self.device())
