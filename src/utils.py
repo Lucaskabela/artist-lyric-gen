@@ -114,14 +114,15 @@ class Corpus(object):
                 context = [1] # Place holder, make song title
                 for line in verse:
                     words = line.split()[1:] # Disregard start of line
-                    ids = []
-                    for word in words:
-                        ids.append(self.dictionary.word2idx[word])
-                    x_s.append(torch.tensor(context[-max_context:]).long())
-                    personas.append(torch.tensor(artist_persona).long())
-                    y_s.append(torch.tensor(ids).type(torch.long))
-                    # Do not append start of sequence to context
-                    context.extend(ids[1:])
+                    if len(words) > 0:
+                        ids = []
+                        for word in words:
+                            ids.append(self.dictionary.word2idx[word])
+                        x_s.append(torch.tensor(context[-max_context:]).long())
+                        personas.append(torch.tensor(artist_persona).long())
+                        y_s.append(torch.tensor(ids).type(torch.long))
+                        # Do not append start of sequence to context
+                        context.extend(ids[1:])
         # Do not return idss, return the datasets instead!
         return RapPersonaDataset(x_s, personas, y_s)
 

@@ -101,18 +101,18 @@ class CVAE(BaseNetwork):
             emb_dim, hidden_size, bidirectional=True, batch_first=True
         )
 
-        self.recognition = nn.Linear(hidden_size * 2, hidden_size * 2)
+        self.recognition = nn.Linear(hidden_size * 6, hidden_size * 2)
         self.r_mu = nn.Linear(hidden_size * 2, latent_dim)
         self.r_log_var = nn.Linear(hidden_size * 2, latent_dim)
 
-        self.prior = nn.Linear(hidden_size * 4, hidden_size * 4)
-        self.p_mu = nn.Linear(hidden_size * 4, latent_dim)
-        self.p_log_var = nn.Linear(hidden_size * 4, latent_dim)
+        self.prior = nn.Linear(hidden_size * 4, hidden_size * 2)
+        self.p_mu = nn.Linear(hidden_size * 2, latent_dim)
+        self.p_log_var = nn.Linear(hidden_size * 2, latent_dim)
 
         # Make this latent + hidden (?)
         self.latent2hidden = nn.Linear(latent_dim, hidden_size)
-        self.decoder = nn.LSTM(emb_dim, hidden_size, batch_first=True)
-        self.out = nn.Linear(hidden_size, self.vocab_size)
+        self.decoder = nn.LSTM(emb_dim,  hidden_size * 5, batch_first=True)
+        self.out = nn.Linear( hidden_size * 5, self.vocab_size)
 
     def encode(self, x_emb, x_length, p_emb, p_length, y_emb, y_length):  # Produce Q(z | x, y, p)
         """
@@ -154,7 +154,7 @@ class CVAE(BaseNetwork):
         out_rec = F.elu(self.recognition(hidden_in))
         out_p = F.elu(self.prior(c_enc))
         r_mu, r_log_var = self.r_mu(out_rec), self.r_log_var(out_rec)
-        p_mu, p_log_var = self.p_mu(out_rec), self.p_log_var(out_rec)
+        p_mu, p_log_var = self.p_mu(out_p), self.p_log_var(out_p)
         return r_mu, r_log_var, p_mu, p_log_var, c_enc
 
     def reparameterize(self, mu, log_var):
@@ -170,10 +170,10 @@ class CVAE(BaseNetwork):
         z: (batch_size, latent_size (?))
         c: (batch_size, class_size (?))
         """
-        # to_decode = torch.cat([z, c], dim=-1)
-        to_decode = torch.cat([z, c], dim=-1)
+        to_decode = torch.cat([z, c], dim=-1).unsqueeze(0)
+        to_decode = (to_decode, to_decode)
 
-        y_lengths = torch.LongTensor(y_lens).to(self.device())
+        y_lengths = torch.LongTensor([y + 1 for y in y_lens]).to(self.device())
         sorted_lengths, sorted_idx = torch.sort(y_lengths, descending=True)
         y = y[sorted_idx]
         packed_y = pack_padded_sequence(
@@ -202,8 +202,7 @@ class CVAE(BaseNetwork):
 
         # Handle formatting the latent properly for LSTM
         z = self.reparameterize(r_mu, r_log_var)
-        hidden = self.latent2hidden(z)
-        hidden = (hidden.unsqueeze(0), hidden.unsqueeze(0))
+        hidden = self.latent2hidden(z).unsqueeze(0)
 
         # Teacher forcing here - Preppend SOS token
         SOS = torch.ones(y.shape[0], 1).long().to(self.device())

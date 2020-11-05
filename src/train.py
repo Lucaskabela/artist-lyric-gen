@@ -22,7 +22,7 @@ def cvae_loss_function(x_p, x, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
     recog = torch.distributions.normal.Normal(r_mu, r_log_var)
     prior = torch.distributions.normal.Normal(p_mu, p_log_var)
     BCE = F.nll_loss(x_p, x, reduction="sum", ignore_index=0)
-    KLD = -F.kl_div(recog, prior)
+    KLD = -torch.distributions.kl_divergence(recog, prior).mean()
     return BCE + alpha * KLD
 
 
