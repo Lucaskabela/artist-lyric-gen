@@ -92,6 +92,7 @@ class CVAE(BaseNetwork):
         self.embedding = nn.Embedding(self.vocab_size, emb_dim)
         nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
         self.dropout = nn.Dropout(p=drop)
+        self.tanh = torch.nn.Tanh()
 
         # X and P will be encoded then concatenated
         self.x_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
@@ -149,11 +150,11 @@ class CVAE(BaseNetwork):
 
         # Should I concatenate context here too?
         hidden_in = torch.cat([y_enc, c_enc], dim=-1)
-        out_rec = F.tanh(self.recognition(hidden_in))
-        out_prior = F.tanh(self.prior(c_enc))
+        out_rec = self.tanh(self.recognition(hidden_in))
+        out_prior = self.tanh(self.prior(c_enc))
 
-        r_mu_log_var = torch.split(self.r_mu_log_var(out_rec), 2, dim=-1)
-        p_mu, p_log_var = torch.split(self.p_mu_log_var(out_prior), 2, dim=-1)
+        r_mu_log_var = torch.split(self.r_mu_log_var(out_rec), self.latent_dim, dim=-1)
+        p_mu, p_log_var = torch.split(self.p_mu_log_var(out_prior), self.latent_dim, dim=-1)
         return r_mu, r_log_var, p_mu, p_log_var, c_enc
 
     def reparameterize(self, mu, log_var):
