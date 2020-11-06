@@ -17,8 +17,8 @@ import torch.utils.tensorboard as tb
 
 def gaussian_kld(recog_mu, recog_logvar, prior_mu, prior_logvar):
     kld = -0.5 * (1 + (recog_logvar - prior_logvar)
-                               - torch.div(tf.pow(prior_mu - recog_mu, 2), torch.exp(prior_logvar))
-                               - torch.div(tf.exp(recog_logvar), torch.exp(prior_logvar)))
+                               - torch.div(torch.pow(prior_mu - recog_mu, 2), torch.exp(prior_logvar))
+                               - torch.div(torch.exp(recog_logvar), torch.exp(prior_logvar)))
     return kld
 
 
