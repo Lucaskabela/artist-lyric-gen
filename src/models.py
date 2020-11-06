@@ -113,11 +113,7 @@ class CVAE(BaseNetwork):
         self.decoder = nn.LSTM(emb_dim,  hidden_size, batch_first=True)
         self.out = nn.Linear( hidden_size, self.vocab_size)
 
-    def encode(self, x_emb, x_length, p_emb, p_length, y_emb, y_length):  # Produce Q(z | x, y, p)
-        """
-        x: (seq_len, batch_size)
-        c: (batch_size, class_size (?))
-        """
+    def contextualize(self, x_emb, x_length, p_emb, p_length):
         # For efficency, sort and pack x, then encode!
         sorted_x_lengths, sorted_x_idx = torch.sort(x_length, descending=True)
         x_emb = x_emb[sorted_x_idx]
@@ -135,7 +131,15 @@ class CVAE(BaseNetwork):
         )
         p_h, (p_hn, p_cn) = self.p_encoder(packed_p)
         p_enc = torch.cat([p_hn[0], p_hn[1]], dim=-1)
+        c_enc = torch.cat([x_enc, p_enc], dim=-1)
+        return c_enc
 
+    def encode(self, x_emb, x_length, p_emb, p_length, y_emb, y_length):  # Produce Q(z | x, y, p)
+        """
+        x: (seq_len, batch_size)
+        c: (batch_size, class_size (?))
+        """
+        c_enc = self.contextualize(x_emb, x_length, y_emb, y_length)
 
         # For efficency, sort and pack y, then encode!
         sorted_y_lengths, sorted_y_idx = torch.sort(y_length, descending=True)
@@ -145,8 +149,6 @@ class CVAE(BaseNetwork):
         )
         y_h, (y_hn, y_cn) = self.y_encoder(packed_y)
         y_enc = torch.cat([y_hn[0], y_hn[1]], dim=-1)
-
-        c_enc = torch.cat([x_enc, p_enc], dim=-1)
 
         # Should I concatenate context here too?
         hidden_in = torch.cat([y_enc, c_enc], dim=-1)
@@ -212,3 +214,17 @@ class CVAE(BaseNetwork):
         out_seq = self.decode(teacher_force, y_lengths, to_decode)
 
         return out_seq, r_mu, r_log_var, p_mu, p_log_var
+
+    def infer_hidden(self, x, x_lengths, p, p_lengths):
+        # Embed the padded input
+        x_emb = self.dropout(self.embedding(x))
+        p_emb = self.dropout(self.embedding(p))
+
+        c_enc = self.contextualize(x_emb, x_lengths, p_emb, p_lengths)
+        out_prior = self.tanh(self.prior(c_enc))
+        p_mu, p_log_var = torch.split(self.p_mu_log_var(out_prior), self.latent_dim, dim=-1)
+        z = self.reparameterize(p_mu, p_log_var)
+        to_decode = torch.cat([z, c], dim=-1).unsqueeze(0)
+        hidden = self.latent2hidden(to_decode)
+        to_decode = (hidden, hidden)
+        return to_decode

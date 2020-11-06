@@ -14,7 +14,7 @@ class Dictionary(object):
         self.word2idx = {"<pad>": 0, "S": 1, "L": 2, "<unk>": 3}
         self.idx2word = ["<pad>", "S", "L", "<unk>"]
         self.counter = Counter()
-        self.total = 0
+        self.total = 4
 
     def add_word(self, word):
         if word not in self.word2idx:

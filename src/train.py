@@ -56,35 +56,52 @@ def init_logger(log_dir=None):
     return train_logger, valid_logger
 
 # TODO: Fix eval_inference
-def eval_inference(model, corpus, valid_log, global_step):
+def eval_inference(model, corpus, valid, valid_log, global_step):
     max_len = 30
     # Change to sample context from test and use this to generate / condition
     model.eval()
-    exs = []
-    for i in range(4):
-        out_sequence = ["S"]
-        z = torch.randn([1, model.latent_dim], device=model.device())
-        z = model.latent2hidden(z)
-        hidden = (z.unsqueeze(0), z.unsqueeze(0))
-        # Teacher forcing here
-        word = torch.ones([1, 1], dtype=torch.long, device=model.device())
-        while out_sequence[-1] != "L" and len(out_sequence) < max_len:
-            word = model.embedding(word)
-            outputs, hidden = model.decoder(word, hidden)
-            outputs = F.log_softmax(model.out(outputs), dim=-1)
-            _, word = torch.max(outputs, dim=-1)
-            out_sequence.append(corpus.dictionary.idx2word[word.item()])
-        exs.append(out_sequence)
-
-    # Produce 4 examples here
+    avg_loss = 0
+    num_examples = 0
+    for x, x_len, p, p_len, y, y_len in valid:
+        res = model(x, x_len, p, p_len, y, y_len)
+        pred, r_mu, r_log_var, p_mu, p_log_var = res
+        eos_tensor = torch.empty(x.shape[0], 1).to(device)
+        eos_tensor.fill_(corpus.dictionary.word2idx["L"])
+        gold = torch.cat([y, eos_tensor], dim=1).long()
+        pred = pred.permute(0, 2, 1)
+        BCE = F.nll_loss(pred, gold, reduction="sum", ignore_index=0)
+        avg_loss += BCE.item()
+        num_examples += x.shape[0] # Add how many examples we saw
     if valid_log is not None:
-        for i in range(len(exs)):
-            name_ = "generated_example_{}".format(i)
-            valid_log.add_text(name_, str(exs[i]), global_step)
+        valid_log.add_scalar("Valid NLL", avg_loss/num_examples, global_step)
+
+    # Now, generate one example
+    x, x_len, p, p_len = x[0, :, :], x_len[0, :, :], p[0, :, :], p_len[0, :, :]
+    x, x_len = x.unsqueeze(0), x_len.unsqueeze(0),
+    p, p_len = p.unsqueeze(0), p_len.unsqueeze(0)
+    out_sequence = ["S"]
+    hidden = model.infer_hidden(x, x_len, p, p_len)
+    # Teacher forcing here
+    word = torch.ones([1, 1], dtype=torch.long, device=model.device())
+    while out_sequence[-1] != "L" and len(out_sequence) < max_len:
+        word = model.embedding(word)
+        outputs, hidden = model.decoder(word, hidden)
+        outputs = F.log_softmax(model.out(outputs), dim=-1)
+        _, word = torch.max(outputs, dim=-1)
+        out_sequence.append(corpus.dictionary.idx2word[word.item()])
+
+    if valid_log is not None:
+        x_str = [corpus.dictionary.idx2word[word.item()] for word in x[0]]
+        p_str = [corpus.dictionary.idx2word[word.item()] for word in p[0]]
+        valid_log.add_text("context", str(x_str), global_step)
+        valid_log.add_text("persona", str(p_str), global_step)
+        valid_log.add_text("generated", str(out_sequence), global_step)
     else:
-        for i in range(len(exs)):
-            name_ = "generated_example_{}".format(i)
-            print(name_, exs[i])
+        x_str = [corpus.dictionary.idx2word[word.item()] for word in x[0]]
+        p_str = [corpus.dictionary.idx2word[word.item()] for word in p[0]]
+        print("context", x_str)
+        print("persona", p_str)
+        print("generated", out_sequence)
     model.train()
 
 
