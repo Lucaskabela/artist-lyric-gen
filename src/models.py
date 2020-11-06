@@ -109,9 +109,9 @@ class CVAE(BaseNetwork):
         self.p_mu_log_var = nn.Linear(hidden_size * 2, latent_dim * 2)
 
         # Make this latent + hidden (?)
-        self.latent2hidden = nn.Linear(latent_dim, hidden_size)
-        self.decoder = nn.LSTM(emb_dim,  hidden_size * 5, batch_first=True)
-        self.out = nn.Linear( hidden_size * 5, self.vocab_size)
+        self.latent2hidden = nn.Linear(latent_dim + hidden_size * 4, hidden_size)
+        self.decoder = nn.LSTM(emb_dim,  hidden_size, batch_first=True)
+        self.out = nn.Linear( hidden_size, self.vocab_size)
 
     def encode(self, x_emb, x_length, p_emb, p_length, y_emb, y_length):  # Produce Q(z | x, y, p)
         """
@@ -165,13 +165,11 @@ class CVAE(BaseNetwork):
         eps = torch.randn_like(std)
         return mu + eps * std
 
-    def decode(self, y, y_lens, z, c):  # Produce P(x | z, c)
+    def decode(self, y, y_lens, to_decode):  # Produce P(x | z, c)
         """
         z: (batch_size, latent_size (?))
         c: (batch_size, class_size (?))
         """
-        to_decode = torch.cat([z, c], dim=-1).unsqueeze(0)
-        to_decode = (to_decode, to_decode)
 
         y_lengths = torch.LongTensor([y + 1 for y in y_lens]).to(self.device())
         sorted_lengths, sorted_idx = torch.sort(y_lengths, descending=True)
@@ -202,13 +200,15 @@ class CVAE(BaseNetwork):
 
         # Handle formatting the latent properly for LSTM
         z = self.reparameterize(r_mu, r_log_var)
-        hidden = self.latent2hidden(z)
+        to_decode = torch.cat([z, c], dim=-1).unsqueeze(0)
+        hidden = self.latent2hidden(to_decode)
+        to_decode = (hidden, hidden)
 
         # Teacher forcing here - Preppend SOS token
         SOS = torch.ones(y.shape[0], 1).long().to(self.device())
         SOS = self.dropout(self.embedding(SOS))
 
         teacher_force = torch.cat([SOS, y_emb], dim=1)
-        out_seq = self.decode(teacher_force, y_lengths, hidden, c)
+        out_seq = self.decode(teacher_force, y_lengths, to_decode)
 
         return out_seq, r_mu, r_log_var, p_mu, p_log_var
