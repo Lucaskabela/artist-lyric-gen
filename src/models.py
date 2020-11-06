@@ -153,7 +153,7 @@ class CVAE(BaseNetwork):
         out_rec = self.tanh(self.recognition(hidden_in))
         out_prior = self.tanh(self.prior(c_enc))
 
-        r_mu_log_var = torch.split(self.r_mu_log_var(out_rec), self.latent_dim, dim=-1)
+        r_mu, log_var = torch.split(self.r_mu_log_var(out_rec), self.latent_dim, dim=-1)
         p_mu, p_log_var = torch.split(self.p_mu_log_var(out_prior), self.latent_dim, dim=-1)
         return r_mu, r_log_var, p_mu, p_log_var, c_enc
 
