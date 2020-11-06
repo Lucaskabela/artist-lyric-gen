@@ -102,12 +102,10 @@ class CVAE(BaseNetwork):
         )
 
         self.recognition = nn.Linear(hidden_size * 6, hidden_size * 2)
-        self.r_mu = nn.Linear(hidden_size * 2, latent_dim)
-        self.r_log_var = nn.Linear(hidden_size * 2, latent_dim)
+        self.r_mu_log_var = nn.Linear(hidden_size * 2, latent_dim * 2)
 
         self.prior = nn.Linear(hidden_size * 4, hidden_size * 2)
-        self.p_mu = nn.Linear(hidden_size * 2, latent_dim)
-        self.p_log_var = nn.Linear(hidden_size * 2, latent_dim)
+        self.p_log_var = nn.Linear(hidden_size * 2, latent_dim * 2)
 
         # Make this latent + hidden (?)
         self.latent2hidden = nn.Linear(latent_dim, hidden_size)
@@ -151,10 +149,11 @@ class CVAE(BaseNetwork):
 
         # Should I concatenate context here too?
         hidden_in = torch.cat([y_enc, c_enc], dim=-1)
-        out_rec = F.elu(self.recognition(hidden_in))
-        out_p = F.elu(self.prior(c_enc))
-        r_mu, r_log_var = self.r_mu(out_rec), self.r_log_var(out_rec)
-        p_mu, p_log_var = self.p_mu(out_p), self.p_log_var(out_p)
+        out_rec = F.tanh(self.recognition(hidden_in))
+        out_prior = F.tanh(self.prior(c_enc))
+
+        r_mu_log_var = torch.split(self.r_mu_log_var(out_rec), 2, dim=-1)
+        p_mu, p_log_var = torch.split(self.p_mu_log_var(out_prior), 2, dim=-1)
         return r_mu, r_log_var, p_mu, p_log_var, c_enc
 
     def reparameterize(self, mu, log_var):

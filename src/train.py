@@ -13,6 +13,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.tensorboard as tb
 
+
+
+def gaussian_kld(recog_mu, recog_logvar, prior_mu, prior_logvar):
+    kld = -0.5 * (1 + (recog_logvar - prior_logvar)
+                               - torch.div(tf.pow(prior_mu - recog_mu, 2), torch.exp(prior_logvar))
+                               - torch.div(tf.exp(recog_logvar), torch.exp(prior_logvar)))
+    return kld
+
+
 def cvae_loss_function(x_p, x, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
     """
     Loss for CVAE is BCE + KLD
@@ -21,8 +30,8 @@ def cvae_loss_function(x_p, x, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
     """
     recog = torch.distributions.normal.Normal(r_mu, r_log_var)
     prior = torch.distributions.normal.Normal(p_mu, p_log_var)
-    BCE = F.nll_loss(x_p, x, reduction="sum", ignore_index=0)
-    KLD = -torch.distributions.kl_divergence(recog, prior).mean()
+    BCE = F.nll_loss(x_p, x, reduction="mean", ignore_index=0)
+    KLD = gaussian_kld(r_mu, r_log_var, p_mu, p_log_var).mean()
     return BCE + alpha * KLD
 
 
