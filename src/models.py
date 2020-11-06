@@ -105,7 +105,7 @@ class CVAE(BaseNetwork):
         self.r_mu_log_var = nn.Linear(hidden_size * 2, latent_dim * 2)
 
         self.prior = nn.Linear(hidden_size * 4, hidden_size * 2)
-        self.p_log_var = nn.Linear(hidden_size * 2, latent_dim * 2)
+        self.p_mu_log_var = nn.Linear(hidden_size * 2, latent_dim * 2)
 
         # Make this latent + hidden (?)
         self.latent2hidden = nn.Linear(latent_dim, hidden_size)
