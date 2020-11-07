@@ -116,8 +116,8 @@ def train(args):
     # TODO: set up load_data functions - be best if return a data loader
     corpus = utils.Corpus(args.data, args.persona_data)
     # This should return a dataloader or something to that effect
-    train_data = utils.load_data(corpus.train, batch_size=args.batch_size, num_workers=2)
-    test_data = utils.load_data(corpus.test, batch_size=args.batch_size, num_workers=2)
+    train_data = utils.load_data(corpus.train, batch_size=args.batch_size, num_workers=4)
+    test_data = utils.load_data(corpus.test, batch_size=args.batch_size, num_workers=4)
 
     vocab = len(corpus.dictionary)
     model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
@@ -132,37 +132,36 @@ def train(args):
 
     global_step = 0
     for epoch in range(args.num_epoch):
+        # losses = []
+        # for x, x_len, p, p_len, y, y_len in train_data:
+        #     # Now we need to make sure everything in the batch has same size
+        #     x, x_len = x.to(device), x_len.to(device)
+        #     p, p_len = p.to(device), p_len.to(device)
+        #     y, y_len = y.to(device), y_len.to(device)
+        #     res = model(x, x_len, p, p_len, y, y_len)
+        #     pred, r_mu, r_log_var, p_mu, p_log_var = res
 
-        losses = []
-        for x, x_len, p, p_len, y, y_len in train_data:
-            # Now we need to make sure everything in the batch has same size
-            x, x_len = x.to(device), x_len.to(device)
-            p, p_len = p.to(device), p_len.to(device)
-            y, y_len = y.to(device), y_len.to(device)
-            res = model(x, x_len, p, p_len, y, y_len)
-            pred, r_mu, r_log_var, p_mu, p_log_var = res
+        #     eos_tensor = torch.empty(x.shape[0], 1).to(device)
+        #     eos_tensor.fill_(corpus.dictionary.word2idx["L"])
+        #     gold = torch.cat([y, eos_tensor], dim=1).long()
+        #     alph = min(max(0, (global_step - 10_000) / 60_000), 1)
+        #     pred = pred.permute(0, 2, 1)
+        #     # Get loss, normalized by batch size
+        #     loss_val = loss(pred, gold, r_mu, r_log_var, p_mu, p_log_var, alpha=alph)
 
-            eos_tensor = torch.empty(x.shape[0], 1).to(device)
-            eos_tensor.fill_(corpus.dictionary.word2idx["L"])
-            gold = torch.cat([y, eos_tensor], dim=1).long()
-            alph = min(max(0, (global_step - 10_000) / 60_000), 1)
-            pred = pred.permute(0, 2, 1)
-            # Get loss, normalized by batch size
-            loss_val = loss(pred, gold, r_mu, r_log_var, p_mu, p_log_var, alpha=alph)
+        #     optimizer.zero_grad()
+        #     loss_val.backward()
+        #     if args.grad_clip > 0.0:
+        #         nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+        #     optimizer.step()
+        #     scheduler.step()
+        #     global_step += 1
 
-            optimizer.zero_grad()
-            loss_val.backward()
-            if args.grad_clip > 0.0:
-                nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
-            optimizer.step()
-            scheduler.step()
-            global_step += 1
+        #     losses.append(loss_val.detach().cpu().numpy())
+        #     if train_log is not None:
+        #         train_log.add_scalar("loss", losses[-1], global_step)
 
-            losses.append(loss_val.detach().cpu().numpy())
-            if train_log is not None:
-                train_log.add_scalar("loss", losses[-1], global_step)
-
-        # eval_inference(model, corpus, valid_log, global_step)
+        eval_inference(model, corpus, valid, valid_log, global_step)
         avg_l = np.mean(losses)
         print("epoch %-3d \t loss = %0.3f \t" % (epoch, avg_l))
         model.save_model()
