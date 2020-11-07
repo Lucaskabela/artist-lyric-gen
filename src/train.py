@@ -161,7 +161,7 @@ def train(args):
         #     if train_log is not None:
         #         train_log.add_scalar("loss", losses[-1], global_step)
 
-        eval_inference(model, corpus, valid, valid_log, global_step)
+        eval_inference(model, corpus, test_data, valid_log, global_step)
         avg_l = np.mean(losses)
         print("epoch %-3d \t loss = %0.3f \t" % (epoch, avg_l))
         model.save_model()
