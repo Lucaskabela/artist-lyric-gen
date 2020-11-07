@@ -242,7 +242,7 @@ class CVAE(BaseNetwork):
         p_mu, p_log_var = torch.split(p, self.latent_dim, dim=-1)
 
         z = self.reparameterize(p_mu, p_log_var)
-        to_decode = torch.cat([z, c], dim=-1).unsqueeze(0)
+        to_decode = torch.cat([z, c_enc], dim=-1).unsqueeze(0)
         hidden = self.latent2hidden(to_decode)
 
         return (hidden, hidden)
