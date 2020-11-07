@@ -59,10 +59,14 @@ def init_logger(log_dir=None):
 def eval_inference(model, corpus, valid, valid_log, global_step):
     max_len = 30
     # Change to sample context from test and use this to generate / condition
+    device = model.device()
     model.eval()
     avg_loss = 0
     num_examples = 0
     for x, x_len, p, p_len, y, y_len in valid:
+        x, x_len = x.to(device), x_len.to(device)
+        p, p_len = p.to(device), p_len.to(device)
+        y, y_len = y.to(device), y_len.to(device)
         res = model(x, x_len, p, p_len, y, y_len)
         pred, r_mu, r_log_var, p_mu, p_log_var = res
         eos_tensor = torch.empty(x.shape[0], 1).to(device)
