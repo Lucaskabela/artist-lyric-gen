@@ -133,7 +133,7 @@ def train(args):
     model = model.to(device)
 
     loss = cvae_loss_function
-    validation = float("inf")
+    best = float("inf")
     global_step = 0
     for epoch in range(args.num_epoch):
         losses = []
