@@ -98,8 +98,8 @@ class CVAE(BaseNetwork):
         self.hidden_dropout = nn.Dropout(p=drop)
 
         # Layer Norms for stability
-        self.recoglnorm = nn.LayerNorm([1, hidden_size * 2])
-        self.priorlnorm = nn.LayerNorm([1, hidden_size * 2])
+        self.recoglnorm = nn.LayerNorm(hidden_size * 2)
+        self.priorlnorm = nn.LayerNorm(hidden_size * 2)
 
         # Because F.... is depricated
         self.tanh = torch.tanh
