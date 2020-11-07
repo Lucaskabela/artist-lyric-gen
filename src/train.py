@@ -172,4 +172,4 @@ def train(args):
             best = validation
             model.save_model()
 
-print("Finished training, best model got: {} NLL".format(best))
+    print("Finished training, best model got: {} NLL".format(best))
