@@ -150,3 +150,5 @@ secrets.txt
 */data/songs/*
 *.tgz
 *.DS_STORE
+
+*.th
