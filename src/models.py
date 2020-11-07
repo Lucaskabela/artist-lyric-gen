@@ -91,13 +91,18 @@ class CVAE(BaseNetwork):
 
         self.embedding = nn.Embedding(self.vocab_size, emb_dim)
         nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
-        self.dropout = nn.Dropout(p=drop)
+
+        # Create the dropout layers
+        self.emb_dropout = nn.Dropout(p=drop)
+        self.latent_dropout = nn.Dropout(p=drop)
+        self.hidden_dropout = nn.Dropout(p=drop)
 
         # Layer Norms for stability
         self.recoglnorm = nn.LayerNorm([1, hidden_size * 2])
         self.priorlnorm = nn.LayerNorm([1, hidden_size * 2])
 
-        self.tanh = torch.nn.Tanh()
+        # Because F.... is depricated
+        self.tanh = torch.tanh
 
         # X and P will be encoded then concatenated
         self.x_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
@@ -117,6 +122,7 @@ class CVAE(BaseNetwork):
         self.latent2hidden = nn.Linear(latent_dim + hidden_size * 4, hidden_size)
         self.decoder = nn.LSTM(emb_dim,  hidden_size, batch_first=True)
         self.out = nn.Linear( hidden_size, self.vocab_size)
+        self.log_softmax = nn.LogSoftmax(dim=-1)
 
     def contextualize(self, x_emb, x_length, p_emb, p_length):
         # For efficency, sort and pack x, then encode!
@@ -160,8 +166,12 @@ class CVAE(BaseNetwork):
         out_rec = self.recoglnorm(self.tanh(self.recognition(hidden_in)))
         out_prior = self.priorlnorm(self.tanh(self.prior(c_enc)))
 
-        r_mu, r_log_var = torch.split(self.r_mu_log_var(out_rec), self.latent_dim, dim=-1)
-        p_mu, p_log_var = torch.split(self.p_mu_log_var(out_prior), self.latent_dim, dim=-1)
+        r = self.latent_dropout(self.r_mu_log_var(out_rec))
+        r_mu, r_log_var = torch.split(r, self.latent_dim, dim=-1)
+
+        p = self.latent_dropout(self.p_mu_log_var(out_prior))
+        p_mu, p_log_var = torch.split(p, self.latent_dim, dim=-1)
+
         return r_mu, r_log_var, p_mu, p_log_var, c_enc
 
     def reparameterize(self, mu, log_var):
@@ -193,27 +203,27 @@ class CVAE(BaseNetwork):
         padded_outputs = padded_outputs[reversed_idx]
 
         # Project output to vocab
-        output = F.log_softmax(self.out(padded_outputs), dim=-1)
+        output = self.log_softmax(self.out(padded_outputs))
         return output
 
     def forward(self, x, x_lengths, p, p_lengths, y, y_lengths):
 
         # Embed the padded input
-        x_emb = self.dropout(self.embedding(x))
-        p_emb = self.dropout(self.embedding(p))
-        y_emb = self.dropout(self.embedding(y))
+        x_emb = self.emb_dropout(self.embedding(x))
+        p_emb = self.emb_dropout(self.embedding(p))
+        y_emb = self.emb_dropout(self.embedding(y))
         params = self.encode(x_emb, x_lengths, p_emb, p_lengths, y_emb, y_lengths)
         r_mu, r_log_var, p_mu, p_log_var, c = params
 
         # Handle formatting the latent properly for LSTM
         z = self.reparameterize(r_mu, r_log_var)
         to_decode = torch.cat([z, c], dim=-1).unsqueeze(0)
-        hidden = self.latent2hidden(to_decode)
+        hidden = self.hidden_dropout(self.latent2hidden(to_decode))
         to_decode = (hidden, hidden)
 
         # Teacher forcing here - Preppend SOS token
         SOS = torch.ones(y.shape[0], 1).long().to(self.device())
-        SOS = self.dropout(self.embedding(SOS))
+        SOS = self.emb_dropout(self.embedding(SOS))
 
         teacher_force = torch.cat([SOS, y_emb], dim=1)
         out_seq = self.decode(teacher_force, y_lengths, to_decode)
@@ -222,14 +232,17 @@ class CVAE(BaseNetwork):
 
     def infer_hidden(self, x, x_lengths, p, p_lengths):
         # Embed the padded input
-        x_emb = self.dropout(self.embedding(x))
-        p_emb = self.dropout(self.embedding(p))
+        x_emb = self.emb_dropout(self.embedding(x))
+        p_emb = self.emb_dropout(self.embedding(p))
 
         c_enc = self.contextualize(x_emb, x_lengths, p_emb, p_lengths)
         out_prior = self.priorlnorm(self.tanh(self.prior(c_enc)))
-        p_mu, p_log_var = torch.split(self.p_mu_log_var(out_prior), self.latent_dim, dim=-1)
+
+        p = self.latent_dropout(self.p_mu_log_var(out_prior))
+        p_mu, p_log_var = torch.split(p, self.latent_dim, dim=-1)
+
         z = self.reparameterize(p_mu, p_log_var)
         to_decode = torch.cat([z, c], dim=-1).unsqueeze(0)
         hidden = self.latent2hidden(to_decode)
-        to_decode = (hidden, hidden)
-        return to_decode
+
+        return (hidden, hidden)
