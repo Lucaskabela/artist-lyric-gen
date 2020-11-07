@@ -28,8 +28,6 @@ def cvae_loss_function(x_p, x, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
         see Appendix B from Kingma and Welling 2014
     Need alpha for KL annealing
     """
-    recog = torch.distributions.normal.Normal(r_mu, r_log_var)
-    prior = torch.distributions.normal.Normal(p_mu, p_log_var)
     BCE = F.nll_loss(x_p, x, reduction="mean", ignore_index=0)
     KLD = gaussian_kld(r_mu, r_log_var, p_mu, p_log_var).mean()
     return BCE + alpha * KLD
@@ -165,7 +163,8 @@ def train(args):
             if train_log is not None:
                 train_log.add_scalar("loss", losses[-1], global_step)
 
-        validation = eval_inference(model, corpus, test_data, valid_log, global_step)
+        with torch.no_grad():
+            validation = eval_inference(model, corpus, test_data, valid_log, global_step)
         avg_l = np.mean(losses)
         print("epoch %-3d \t loss = %0.3f \t" % (epoch, avg_l))
         if validation < best:
