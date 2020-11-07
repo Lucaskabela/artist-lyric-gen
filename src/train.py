@@ -80,7 +80,7 @@ def eval_inference(model, corpus, valid, valid_log, global_step):
         valid_log.add_scalar("Valid NLL", avg_loss/num_examples, global_step)
 
     # Now, generate one example
-    x, x_len, p, p_len = x[0, :], x_len[0, :], p[0, :], p_len[0, :]
+    x, x_len, p, p_len = x[0, :], x_len[0], p[0, :], p_len[0]
     x, x_len = x.unsqueeze(0), x_len.unsqueeze(0),
     p, p_len = p.unsqueeze(0), p_len.unsqueeze(0)
     out_sequence = ["S"]
