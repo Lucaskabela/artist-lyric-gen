@@ -92,6 +92,11 @@ class CVAE(BaseNetwork):
         self.embedding = nn.Embedding(self.vocab_size, emb_dim)
         nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
         self.dropout = nn.Dropout(p=drop)
+
+        # Layer Norms for stability
+        self.recoglnorm = nn.LayerNorm([1, hidden_size * 2])
+        self.priorlnorm = nn.LayerNorm([1, hidden_size * 2])
+
         self.tanh = torch.nn.Tanh()
 
         # X and P will be encoded then concatenated
@@ -152,8 +157,8 @@ class CVAE(BaseNetwork):
 
         # Should I concatenate context here too?
         hidden_in = torch.cat([y_enc, c_enc], dim=-1)
-        out_rec = self.tanh(self.recognition(hidden_in))
-        out_prior = self.tanh(self.prior(c_enc))
+        out_rec = self.recoglnorm(self.tanh(self.recognition(hidden_in)))
+        out_prior = self.priorlnorm(self.tanh(self.prior(c_enc)))
 
         r_mu, r_log_var = torch.split(self.r_mu_log_var(out_rec), self.latent_dim, dim=-1)
         p_mu, p_log_var = torch.split(self.p_mu_log_var(out_prior), self.latent_dim, dim=-1)
@@ -221,7 +226,7 @@ class CVAE(BaseNetwork):
         p_emb = self.dropout(self.embedding(p))
 
         c_enc = self.contextualize(x_emb, x_lengths, p_emb, p_lengths)
-        out_prior = self.tanh(self.prior(c_enc))
+        out_prior = self.priorlnorm(self.tanh(self.prior(c_enc)))
         p_mu, p_log_var = torch.split(self.p_mu_log_var(out_prior), self.latent_dim, dim=-1)
         z = self.reparameterize(p_mu, p_log_var)
         to_decode = torch.cat([z, c], dim=-1).unsqueeze(0)

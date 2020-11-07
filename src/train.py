@@ -116,12 +116,12 @@ def train(args):
     # TODO: set up load_data functions - be best if return a data loader
     corpus = utils.Corpus(args.data, args.persona_data)
     # This should return a dataloader or something to that effect
-    train_data = utils.load_data(corpus.train, batch_size=args.batch_size)
-    test_data = utils.load_data(corpus.test, batch_size=args.batch_size)
+    train_data = utils.load_data(corpus.train, batch_size=args.batch_size, num_workers=2)
+    test_data = utils.load_data(corpus.test, batch_size=args.batch_size, num_workers=2)
 
     vocab = len(corpus.dictionary)
     model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate,  weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
 
     if args.continue_training:
@@ -149,7 +149,6 @@ def train(args):
             pred = pred.permute(0, 2, 1)
             # Get loss, normalized by batch size
             loss_val = loss(pred, gold, r_mu, r_log_var, p_mu, p_log_var, alpha=alph)
-            loss_val /= args.batch_size
 
             optimizer.zero_grad()
             loss_val.backward()
