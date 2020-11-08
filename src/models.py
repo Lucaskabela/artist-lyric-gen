@@ -262,7 +262,7 @@ class VAE(BaseNetwork):
         name="vae",
     ):
 
-        super(CVAE, self).__init__()
+        super(VAE, self).__init__()
         self.vocab_size = vocab
         self.emb_dim = emb_dim
         self.hidden_size = hidden_size
