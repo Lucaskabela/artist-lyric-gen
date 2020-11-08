@@ -81,7 +81,7 @@ def eval_inference(model, corpus, valid, valid_log, global_step):
         eos_tensor.fill_(corpus.dictionary.word2idx["L"])
         gold = torch.cat([y, eos_tensor], dim=1).long()
         pred = pred.permute(0, 2, 1)
-        BCE = F.nll_loss(pred, gold, reduction="mean", ignore_index=0)
+        BCE = F.nll_loss(pred, gold, reduction="sum", ignore_index=0)
         avg_loss += BCE.item()
         num_examples += y.shape[0] # Add how many examples we saw
     if valid_log is not None:
@@ -186,6 +186,7 @@ def train(args):
         avg_l = np.mean(losses)
         print("epoch %-3d \t loss = %0.3f \t" % (epoch, avg_l))
         if validation < best:
+            print("Saving model!")
             best = validation
             model.save_model()
 
