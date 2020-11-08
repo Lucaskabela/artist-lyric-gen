@@ -246,3 +246,113 @@ class CVAE(BaseNetwork):
         hidden = self.latent2hidden(to_decode)
 
         return (hidden, hidden)
+
+class VAE(BaseNetwork):
+    """
+    Defines the CVAE approach, using LSTMs as Encoder/Decoder
+    """
+
+    def __init__(
+        self,
+        vocab,
+        emb_dim,
+        hidden_size,
+        latent_dim,
+        drop=0.1,
+        name="vae",
+    ):
+
+        super(CVAE, self).__init__()
+        self.vocab_size = vocab
+        self.emb_dim = emb_dim
+        self.hidden_size = hidden_size
+        self.latent_dim = latent_dim
+        self.name = name
+
+        self.embedding = nn.Embedding(self.vocab_size, emb_dim)
+        nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
+        self.dropout = nn.Dropout(p=drop)
+
+        # self.c_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True)
+        self.x_encoder = nn.LSTM(
+            emb_dim, hidden_size, bidirectional=True, batch_first=True
+        )
+        self.recognition = nn.Linear(hidden_size * 2, hidden_size * 2)
+        self.mu = nn.Linear(hidden_size * 2, latent_dim)
+        self.log_var = nn.Linear(hidden_size * 2, latent_dim)
+
+        # Make this latent + hidden (?)
+        self.latent2hidden = nn.Linear(latent_dim, hidden_size)
+        self.decoder = nn.LSTM(emb_dim, hidden_size, batch_first=True)
+        self.out = nn.Linear(hidden_size, self.vocab_size)
+
+    def encode(self, x_emb, x_length):  # Produce Q(z | x, c)
+        """
+        x: (seq_len, batch_size)
+        c: (batch_size, class_size (?))
+        """
+        sorted_lengths, sorted_idx = torch.sort(x_length, descending=True)
+        x_emb = x_emb[sorted_idx]
+        packed_x = pack_padded_sequence(
+            x_emb, sorted_lengths.data.tolist(), batch_first=True
+        )
+        x_h, (x_hn, x_cn) = self.x_encoder(packed_x)
+
+        x_enc = torch.cat([x_hn[0], x_hn[1]], dim=-1)
+
+        out_rec = torch.tanh(self.recognition(x_enc))
+        mu, log_var = self.mu(out_rec), self.log_var(out_rec)
+        return mu, log_var
+
+    def reparameterize(self, mu, log_var):
+        """
+        Apply reparameterization for derivatives -> use rsample()?
+        """
+        std = torch.exp(0.5 * log_var)
+        eps = torch.randn_like(std)
+        return mu + eps * std
+
+    def decode(self, x, x_lens, z):  # Produce P(x | z, c)
+        """
+        z: (batch_size, latent_size (?))
+        c: (batch_size, class_size (?))
+        """
+        to_decode = z
+        x_lengths = torch.LongTensor([x + 1 for x in x_lens]).to(self.device())
+        sorted_lengths, sorted_idx = torch.sort(x_lengths, descending=True)
+        x = x[sorted_idx]
+        packed_x = pack_padded_sequence(
+            x, sorted_lengths.data.tolist(), batch_first=True
+        )
+
+        output, hidden = self.decoder(packed_x, to_decode)
+
+        # Unpack and then return to original order
+        padded_outputs = pad_packed_sequence(output, batch_first=True)[0]
+        _, reversed_idx = torch.sort(sorted_idx)
+        padded_outputs = padded_outputs[reversed_idx]
+
+        # Project output to vocab
+        output = F.log_softmax(self.out(padded_outputs), dim=-1)
+        return output
+
+    def forward(self, x, x_lengths):
+
+        # Embed the padded input
+        x_emb = self.dropout(self.embedding(x))
+
+        mu, log_var = self.encode(x_emb, x_lengths)
+
+        # Handle formatting the latent properly for LSTM
+        z = self.reparameterize(mu, log_var)
+        hidden = self.latent2hidden(z)
+        hidden = (hidden.unsqueeze(0), hidden.unsqueeze(0))
+
+        # Teacher forcing here - Preppend SOS token
+        SOS = torch.ones(x.shape[0], 1).long().to(self.device())
+        SOS = self.dropout(self.embedding(SOS))
+
+        teacher_force = torch.cat([SOS, x_emb], dim=1)
+        out_seq = self.decode(teacher_force, x_lengths, hidden)
+
+        return out_seq, mu, log_var

@@ -21,7 +21,14 @@ def gaussian_kld(recog_mu, recog_logvar, prior_mu, prior_logvar):
                                - torch.div(torch.exp(recog_logvar), torch.exp(prior_logvar)))
     return kld
 
+def gaussian_01kld(mu, log_var):
+        return -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
 
+def vae_loss_function(x_p, x, mu, log_var, alpha=0):
+    BCE = F.nll_loss(x_p, x, reduction="mean", ignore_index=0)
+    KLD = gaussian_01kld(mu, log_var)
+    return BCE + alpha * KLD
+    
 def cvae_loss_function(x_p, x, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
     """
     Loss for CVAE is BCE + KLD
@@ -62,25 +69,31 @@ def eval_inference(model, corpus, valid, valid_log, global_step):
     avg_loss = 0
     num_examples = 0
     for x, x_len, p, p_len, y, y_len in valid:
-        x, x_len = x.to(device), x_len.to(device)
-        p, p_len = p.to(device), p_len.to(device)
+        # x, x_len = x.to(device), x_len.to(device)
+        # p, p_len = p.to(device), p_len.to(device)
         y, y_len = y.to(device), y_len.to(device)
-        res = model(x, x_len, p, p_len, y, y_len)
-        pred, r_mu, r_log_var, p_mu, p_log_var = res
+        # res = model(x, x_len, p, p_len, y, y_len)
+        res = model(y, y_len)
+        # pred, r_mu, r_log_var, p_mu, p_log_var = res
+        pred, mu, log_var = res
+
         eos_tensor = torch.empty(x.shape[0], 1).to(device)
         eos_tensor.fill_(corpus.dictionary.word2idx["L"])
         gold = torch.cat([y, eos_tensor], dim=1).long()
         pred = pred.permute(0, 2, 1)
-        BCE = F.nll_loss(pred, gold, reduction="sum", ignore_index=0)
+        BCE = F.nll_loss(pred, gold, reduction="mean", ignore_index=0)
         avg_loss += BCE.item()
-        num_examples += x.shape[0] # Add how many examples we saw
+        num_examples += y.shape[0] # Add how many examples we saw
     if valid_log is not None:
         valid_log.add_scalar("Valid NLL", avg_loss/num_examples, global_step)
 
     # Now, generate one example
-    x, x_len, p, p_len = x[0, :], x_len[0], p[0, :], p_len[0]
-    x, x_len = x.unsqueeze(0), x_len.unsqueeze(0),
-    p, p_len = p.unsqueeze(0), p_len.unsqueeze(0)
+    # x, x_len, p, p_len = x[0, :], x_len[0], p[0, :], p_len[0]
+    # x, x_len = x.unsqueeze(0), x_len.unsqueeze(0),
+    # p, p_len = p.unsqueeze(0), p_len.unsqueeze(0)
+    z = torch.randn([1, model.latent_dim], device=model.device())
+    z = model.latent2hidden(z)
+    hidden = (z.unsqueeze(0), z.unsqueeze(0))
     out_sequence = ["S"]
     hidden = model.infer_hidden(x, x_len, p, p_len)
     # Teacher forcing here
@@ -93,10 +106,10 @@ def eval_inference(model, corpus, valid, valid_log, global_step):
         out_sequence.append(corpus.dictionary.idx2word[word.item()])
 
     if valid_log is not None:
-        x_str = [corpus.dictionary.idx2word[word.item()] for word in x[0]]
-        p_str = [corpus.dictionary.idx2word[word.item()] for word in p[0]]
-        valid_log.add_text("context", str(x_str), global_step)
-        valid_log.add_text("persona", str(p_str), global_step)
+        # x_str = [corpus.dictionary.idx2word[word.item()] for word in x[0]]
+        # p_str = [corpus.dictionary.idx2word[word.item()] for word in p[0]]
+        # valid_log.add_text("context", str(x_str), global_step)
+        # valid_log.add_text("persona", str(p_str), global_step)
         valid_log.add_text("generated", str(out_sequence), global_step)
     else:
         x_str = [corpus.dictionary.idx2word[word.item()] for word in x[0]]
@@ -122,7 +135,8 @@ def train(args):
     test_data = utils.load_data(corpus.test, batch_size=args.batch_size, num_workers=4)
 
     vocab = len(corpus.dictionary)
-    model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
+    # model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
+    model = models.VAE(vocab, args.embedding, args.hidden, args.latent)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate,  weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
 
@@ -130,18 +144,21 @@ def train(args):
         model.load_model()
     model = model.to(device)
 
-    loss = cvae_loss_function
+    # loss = cvae_loss_function
+    loss = vae_loss_function
     best = float("inf")
     global_step = 0
     for epoch in range(args.num_epoch):
         losses = []
         for x, x_len, p, p_len, y, y_len in train_data:
             # Now we need to make sure everything in the batch has same size
-            x, x_len = x.to(device), x_len.to(device)
-            p, p_len = p.to(device), p_len.to(device)
+            # x, x_len = x.to(device), x_len.to(device)
+            # p, p_len = p.to(device), p_len.to(device)
             y, y_len = y.to(device), y_len.to(device)
-            res = model(x, x_len, p, p_len, y, y_len)
-            pred, r_mu, r_log_var, p_mu, p_log_var = res
+            # res = model(x, x_len, p, p_len, y, y_len)
+            res = model(y, y_len)
+            # pred, r_mu, r_log_var, p_mu, p_log_var = res
+            pred, mu, log_var = res
 
             eos_tensor = torch.empty(x.shape[0], 1).to(device)
             eos_tensor.fill_(corpus.dictionary.word2idx["L"])
@@ -149,7 +166,8 @@ def train(args):
             alph = min(max(0, (global_step - 10_000) / 60_000), 1)
             pred = pred.permute(0, 2, 1)
             # Get loss, normalized by batch size
-            loss_val = loss(pred, gold, r_mu, r_log_var, p_mu, p_log_var, alpha=alph)
+            # loss_val = loss(pred, gold, r_mu, r_log_var, p_mu, p_log_var, alpha=alph)
+            loss_val = loss(pred, gold, mu, log_var)
 
             optimizer.zero_grad()
             loss_val.backward()
