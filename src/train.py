@@ -152,7 +152,6 @@ def train(args):
             y, y_len = y.to(device), y_len.to(device)
             # Should go from 1 to 0 of ~80k steps
             teach = 1 - min(max(0, (global_step - 20_000) / 80_000), 1)
-            print(teach)
             res = model(x, x_len, p, p_len, y, y_len, teach)
             pred, r_mu, r_log_var, p_mu, p_log_var = res
 
