@@ -131,6 +131,8 @@ class CVAE(BaseNetwork):
 
         # Make this latent + hidden (?)
         self.latent2hidden = nn.Linear(latent_dim + hidden_size * 4, hidden_size)
+        self.bow1 = nn.Linear(latent_dim + hidden_size * 4, hidden_size)
+        self.bow2 = nn.Linear(hidden_size, self.vocab_size)
 
         if rnn == "lstm":
             self.decoder = nn.LSTM(emb_dim,  hidden_size, batch_first=True)
@@ -245,6 +247,11 @@ class CVAE(BaseNetwork):
         output = self.log_softmax(self.out(padded_outputs))
         return output
 
+    def bow_logits(self, to_decode, max_len):
+        res = self.bow2(self.hidden_dropout(torch.tanh(self.bow1(to_decode))))
+        print(res.shape)
+        return torch.repeat_interleave(res, max_len, dim=1)
+
     def forward(self, x, x_lengths, p, p_lengths, y, y_lengths, teacher_ratio=1):
 
         # Embed the padded input
@@ -257,6 +264,9 @@ class CVAE(BaseNetwork):
         # Handle formatting the latent properly for LSTM
         z = self.reparameterize(r_mu, r_log_var)
         to_decode = torch.cat([z, c], dim=-1).unsqueeze(0)
+
+        bow_log = self.bow_logits(to_decode, max(y_lengths))
+
         hidden = self.hidden_dropout(self.latent2hidden(to_decode))
         if self.rnn == "lstm":
             to_decode = (hidden, hidden)
@@ -270,7 +280,7 @@ class CVAE(BaseNetwork):
         teacher_force = torch.cat([SOS, y_emb], dim=1)
         out_seq = self.decode(teacher_force, y_lengths, to_decode, teacher_ratio=teacher_ratio)
 
-        return out_seq, r_mu, r_log_var, p_mu, p_log_var
+        return out_seq, bow_log, r_mu, r_log_var, p_mu, p_log_var
 
     def infer_hidden(self, x, x_lengths, p, p_lengths):
         # Embed the padded input
