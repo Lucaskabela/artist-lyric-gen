@@ -80,6 +80,7 @@ class CVAE(BaseNetwork):
         latent_dim,
         drop=0.1,
         name="cvae",
+        rnn="lstm"
     ):
 
         super(CVAE, self).__init__()
@@ -88,6 +89,7 @@ class CVAE(BaseNetwork):
         self.hidden_size = hidden_size
         self.latent_dim = latent_dim
         self.name = name
+        self.rnn = rnn
 
         self.embedding = nn.Embedding(self.vocab_size, emb_dim)
         nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
@@ -105,13 +107,21 @@ class CVAE(BaseNetwork):
         self.tanh = torch.tanh
 
         # X and P will be encoded then concatenated
-        self.x_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
-        self.p_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
+        if rnn == "lstm":
+            self.x_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
+            self.p_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
 
-        self.y_encoder = nn.LSTM(
-            emb_dim, hidden_size, bidirectional=True, batch_first=True
-        )
+            self.y_encoder = nn.LSTM(
+                emb_dim, hidden_size, bidirectional=True, batch_first=True
+            )
+        elif rnn == "gru":
+            self.x_encoder = nn.GRU(emb_dim, hidden_size, bidirectional=True, batch_first=True)
+            self.p_encoder = nn.GRU(emb_dim, hidden_size, bidirectional=True, batch_first=True)
 
+            self.y_encoder = nn.GRU(
+                emb_dim, hidden_size, bidirectional=True, batch_first=True
+            )           
+ 
         self.recognition = nn.Linear(hidden_size * 6, hidden_size * 2)
         self.r_mu_log_var = nn.Linear(hidden_size * 2, latent_dim * 2)
 
@@ -120,7 +130,14 @@ class CVAE(BaseNetwork):
 
         # Make this latent + hidden (?)
         self.latent2hidden = nn.Linear(latent_dim + hidden_size * 4, hidden_size)
-        self.decoder = nn.LSTM(emb_dim,  hidden_size, batch_first=True)
+
+        if rnn == "lstm":
+            self.decoder = nn.LSTM(emb_dim,  hidden_size, batch_first=True)
+        elif rnn == "gru":
+            self.decoder = nn.GRU(emb_dim,  hidden_size, batch_first=True)
+        else:
+            raise Exception("RNN type {} is not supported".format(rnn))
+
         self.out = nn.Linear( hidden_size, self.vocab_size)
         self.log_softmax = nn.LogSoftmax(dim=-1)
 
@@ -131,7 +148,10 @@ class CVAE(BaseNetwork):
         packed_x = pack_padded_sequence(
             x_emb, sorted_x_lengths.data.tolist(), batch_first=True
         )
-        x_h, (x_hn, x_cn) = self.x_encoder(packed_x)
+        x_h, x_hn = self.x_encoder(packed_x)
+        if self.rnn == "lstm":
+            # Disregard the cell if lstm
+            x_hn = x_hn[0]
         x_enc = torch.cat([x_hn[0], x_hn[1]], dim=-1)
 
         # For efficency, sort and pack p, then encode!
@@ -140,7 +160,11 @@ class CVAE(BaseNetwork):
         packed_p = pack_padded_sequence(
             p_emb, sorted_p_lengths.data.tolist(), batch_first=True
         )
-        p_h, (p_hn, p_cn) = self.p_encoder(packed_p)
+        p_h, p_hn = self.p_encoder(packed_p)
+        if self.rnn == "lstm":
+            # Disregard the cell if lstm
+            p_hn = p_hn[0]
+
         p_enc = torch.cat([p_hn[0], p_hn[1]], dim=-1)
         c_enc = torch.cat([x_enc, p_enc], dim=-1)
         return c_enc
@@ -158,7 +182,10 @@ class CVAE(BaseNetwork):
         packed_y = pack_padded_sequence(
             y_emb, sorted_y_lengths.data.tolist(), batch_first=True
         )
-        y_h, (y_hn, y_cn) = self.y_encoder(packed_y)
+        y_h, y_hn = self.y_encoder(packed_y)
+        if self.rnn == "lstm":
+            # Disregard the cell if lstm
+            y_hn = y_hn[0]
         y_enc = torch.cat([y_hn[0], y_hn[1]], dim=-1)
 
         # Should I concatenate context here too?
@@ -182,31 +209,42 @@ class CVAE(BaseNetwork):
         eps = torch.randn_like(std)
         return mu + eps * std
 
-    def decode(self, y, y_lens, to_decode):  # Produce P(x | z, c)
+    def decode(self, y, y_lens, to_decode, teacher_ratio=1):  # Produce P(x | z, c)
         """
         z: (batch_size, latent_size (?))
         c: (batch_size, class_size (?))
         """
-
+        use_teacher = 1 if random.random() < teacher_ratio else 0
         y_lengths = torch.LongTensor([y + 1 for y in y_lens]).to(self.device())
         sorted_lengths, sorted_idx = torch.sort(y_lengths, descending=True)
-        y = y[sorted_idx]
-        packed_y = pack_padded_sequence(
-            y, sorted_lengths.data.tolist(), batch_first=True
-        )
 
-        output, hidden = self.decoder(packed_y, to_decode)
-
-        # Unpack and then return to original order
-        padded_outputs = pad_packed_sequence(output, batch_first=True)[0]
-        _, reversed_idx = torch.sort(sorted_idx)
-        padded_outputs = padded_outputs[reversed_idx]
+        if use_teacher:
+            y = y[sorted_idx]
+            packed_y = pack_padded_sequence(
+                y, sorted_lengths.data.tolist(), batch_first=True
+            )
+            output, hidden = self.decoder(packed_y, to_decode)
+            # Unpack and then return to original order
+            padded_outputs = pad_packed_sequence(output, batch_first=True)[0]
+            _, reversed_idx = torch.sort(sorted_idx)
+            padded_outputs = padded_outputs[reversed_idx]
+        else:
+            decoder_outputs = []
+            # Get SOS as input
+            decoder_input = y[:, 0, :]
+            # Go for length of longest sequence
+            for di in range(sorted_lengths[0]):
+                output, hidden = self.decoder(decoder_input, hidden)
+                topv, topi = output.topk(1)
+                decoder_input = topi.squeeze().detach()  # detach from history as input
+                decoder_outputs.append(output)
+            padded_outputs = torch.stack(decoder_outputs, dim=1)
 
         # Project output to vocab
         output = self.log_softmax(self.out(padded_outputs))
         return output
 
-    def forward(self, x, x_lengths, p, p_lengths, y, y_lengths):
+    def forward(self, x, x_lengths, p, p_lengths, y, y_lengths, teacher_ratio=1):
 
         # Embed the padded input
         x_emb = self.emb_dropout(self.embedding(x))
@@ -219,14 +257,17 @@ class CVAE(BaseNetwork):
         z = self.reparameterize(r_mu, r_log_var)
         to_decode = torch.cat([z, c], dim=-1).unsqueeze(0)
         hidden = self.hidden_dropout(self.latent2hidden(to_decode))
-        to_decode = (hidden, hidden)
+        if self.rnn == "lstm":
+            to_decode = (hidden, hidden)
+        else:
+            to_decode = hidden
 
         # Teacher forcing here - Preppend SOS token
         SOS = torch.ones(y.shape[0], 1).long().to(self.device())
         SOS = self.emb_dropout(self.embedding(SOS))
 
         teacher_force = torch.cat([SOS, y_emb], dim=1)
-        out_seq = self.decode(teacher_force, y_lengths, to_decode)
+        out_seq = self.decode(teacher_force, y_lengths, to_decode, teacher_ratio=teacher_ratio)
 
         return out_seq, r_mu, r_log_var, p_mu, p_log_var
 
@@ -245,7 +286,7 @@ class CVAE(BaseNetwork):
         to_decode = torch.cat([z, c_enc], dim=-1).unsqueeze(0)
         hidden = self.latent2hidden(to_decode)
 
-        return (hidden, hidden)
+        return (hidden, hidden) if self.rnn == "lstm" else hidden
 
 class VAE(BaseNetwork):
     """

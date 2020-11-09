@@ -39,6 +39,7 @@ def _parse_args():
     parser.add_argument("-hd", "--hidden", type=int, default=500)
     parser.add_argument("-l", "--latent", type=int, default=100)
     parser.add_argument("-d", "--dropout", type=float, default=0.1)
+    parser.add_argument('--rnn', type=str, default='lstm')
 
     # Training related arguments here
     parser.add_argument("--rand_seed", type=int, default=1)
