@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from os import path
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import pathlib
+import random
 
 
 class BaseNetwork(nn.Module):
