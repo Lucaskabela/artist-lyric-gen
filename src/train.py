@@ -8,6 +8,7 @@ from os import path
 import models
 import utils
 import numpy as np
+import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -43,6 +44,7 @@ def cvae_loss_function(x_p, x, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
 def seed_random(rand_seed):
     torch.manual_seed(rand_seed)
     np.random.seed(rand_seed)
+    random.seed(rand_seed)
 
 
 def init_device():
