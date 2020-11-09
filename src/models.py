@@ -249,7 +249,7 @@ class CVAE(BaseNetwork):
 
     def bow_logits(self, to_decode, max_len):
         res = self.bow2(self.hidden_dropout(torch.tanh(self.bow1(to_decode))))
-        print(res.shape)
+        res = res.squeeze(0).unsqueeze(1)
         return torch.repeat_interleave(res, max_len, dim=1)
 
     def forward(self, x, x_lengths, p, p_lengths, y, y_lengths, teacher_ratio=1):

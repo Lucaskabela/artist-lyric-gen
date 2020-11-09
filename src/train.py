@@ -36,8 +36,9 @@ def cvae_loss_function(x_p, x, bow_log, r_mu, r_log_var, p_mu, p_log_var, alpha=
         see Appendix B from Kingma and Welling 2014
     Need alpha for KL annealing
     """
-    BCE = torch.sum(F.nll_loss(x_p, x, ignore_index=0), dim=1).mean()
-    BOW_LOSS = torch.sum(F.cross_entropy_loss(bow_log, x, ignore_index=0), dim=1).mean()
+    BCE = F.nll_loss(x_p, x, ignore_index=0, reduction="mean")
+    bow_log = bow_log.permute(0, 2, 1)
+    BOW_LOSS = F.cross_entropy(bow_log, x[:, :-1], ignore_index=0, reduction="mean")
     KLD = gaussian_kld(r_mu, r_log_var, p_mu, p_log_var).mean()
     return BCE + alpha * KLD + BOW_LOSS
 
