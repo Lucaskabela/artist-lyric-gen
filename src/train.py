@@ -30,15 +30,16 @@ def vae_loss_function(x_p, x, mu, log_var, alpha=0):
     KLD = gaussian_01kld(mu, log_var)
     return BCE + alpha * KLD
     
-def cvae_loss_function(x_p, x, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
+def cvae_loss_function(x_p, x, bow_log, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
     """
     Loss for CVAE is BCE + KLD
         see Appendix B from Kingma and Welling 2014
     Need alpha for KL annealing
     """
-    BCE = F.nll_loss(x_p, x, reduction="mean", ignore_index=0)
+    BCE = torch.sum(F.nll_loss(x_p, x, ignore_index=0), dim=1).mean()
+    BOW_LOSS = torch.sum(F.cross_entropy_loss(bow_log, x, ignore_index=0), dim=1).mean()
     KLD = gaussian_kld(r_mu, r_log_var, p_mu, p_log_var).mean()
-    return BCE + alpha * KLD
+    return BCE + alpha * KLD + BOW_LOSS
 
 
 def seed_random(rand_seed):
@@ -153,7 +154,7 @@ def train(args):
             # Should go from 1 to 0 of ~80k steps
             teach = 1 - min(max(0, (global_step - 20_000) / 80_000), 1)
             res = model(x, x_len, p, p_len, y, y_len, teach)
-            pred, r_mu, r_log_var, p_mu, p_log_var = res
+            pred, bow_log, r_mu, r_log_var, p_mu, p_log_var = res
 
             eos_tensor = torch.empty(x.shape[0], 1).to(device)
             eos_tensor.fill_(corpus.dictionary.word2idx["L"])
@@ -161,7 +162,7 @@ def train(args):
             alph = min(max(0, (global_step - 10_000) / 60_000), 1)
             pred = pred.permute(0, 2, 1)
             # Get loss, normalized by batch size
-            loss_val = loss(pred, gold, r_mu, r_log_var, p_mu, p_log_var, alpha=alph)
+            loss_val = loss(pred, gold, bow_log, r_mu, r_log_var, p_mu, p_log_var, alpha=alph)
 
             optimizer.zero_grad()
             loss_val.backward()
