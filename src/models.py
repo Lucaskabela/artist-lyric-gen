@@ -217,7 +217,7 @@ class CVAE(BaseNetwork):
         z: (batch_size, latent_size (?))
         c: (batch_size, class_size (?))
         """
-        use_teacher = 1 if random.random() < teacher_ratio else 0
+        use_teacher = random.random() < teacher_ratio
         y_lengths = torch.LongTensor([y + 1 for y in y_lens]).to(self.device())
         sorted_lengths, sorted_idx = torch.sort(y_lengths, descending=True)
 
@@ -234,14 +234,15 @@ class CVAE(BaseNetwork):
         else:
             decoder_outputs = []
             # Get SOS as input
-            decoder_input = y[:, 0, :]
+            decoder_input = y[:, 0, :].unsqueeze(1)
+            hidden = to_decode
             # Go for length of longest sequence
             for di in range(sorted_lengths[0]):
                 output, hidden = self.decoder(decoder_input, hidden)
                 topv, topi = output.topk(1)
-                decoder_input = topi.squeeze().detach()  # detach from history as input
+                decoder_input = topi.squeeze(1).detach()  # detach from history as input
                 decoder_outputs.append(output)
-            padded_outputs = torch.stack(decoder_outputs, dim=1)
+            padded_outputs = torch.stack(decoder_outputs, dim=1).squeeze()
 
         # Project output to vocab
         output = self.log_softmax(self.out(padded_outputs))

@@ -77,7 +77,7 @@ def eval_inference(model, corpus, valid, valid_log, global_step):
         p, p_len = p.to(device), p_len.to(device)
         y, y_len = y.to(device), y_len.to(device)
         res = model(x, x_len, p, p_len, y, y_len)
-        pred, r_mu, r_log_var, p_mu, p_log_var = res
+        pred, _, r_mu, r_log_var, p_mu, p_log_var = res
 
         eos_tensor = torch.empty(x.shape[0], 1).to(device)
         eos_tensor.fill_(corpus.dictionary.word2idx["L"])
