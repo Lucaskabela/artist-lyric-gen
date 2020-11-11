@@ -6,7 +6,8 @@ PURPOSE: This file defines the driving functions for the expirements/code
 """
 import argparse
 from train import train
-
+import models
+from eval import perplexity
 
 def _parse_args():
     """
@@ -32,6 +33,7 @@ def _parse_args():
     parser = argparse.ArgumentParser(
         description="Arguments for Lyric Generation project",
     )
+    parser.add_argument("--eval", action="store_true", help="Generate and run eval on a trained model")
     # Model related arguments here
     # Hyperparameters are default from Song et al. 2019
     # Persona information for...
@@ -44,10 +46,10 @@ def _parse_args():
     # Training related arguments here
     parser.add_argument("--rand_seed", type=int, default=1)
     parser.add_argument(
-        "--data", type=str, default="./data/wikitext2", help="Dir of dataset"
+        "--data", type=str, default="./dataset/", help="Dir of dataset"
     )
     parser.add_argument(
-        "--persona_data", type=str, default="./data/personas.json", help="Dir of dataset"
+        "--persona_data", type=str, default="./dataset/persona_tags_bpe.txt", help="Dir of dataset"
     )
     parser.add_argument("--log_dir", type=str, default=None, help="Dir of tb")
     parser.add_argument("-n", "--num_epoch", type=int, default=50)
@@ -62,7 +64,9 @@ def _parse_args():
 
 def main():
     args = _parse_args()
-    train(args)
+    # model = train(args)
+    if args.eval:
+        perplexity(args)
 
 
 if __name__ == "__main__":
