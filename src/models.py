@@ -242,6 +242,7 @@ class CVAE(BaseNetwork):
                 topv, topi = output.topk(1)
                 decoder_input = topi.squeeze(1).detach()  # detach from history as input
                 decoder_outputs.append(output)
+                decoder_input = self.emb_dropout(self.embedding(decoder_input))
             padded_outputs = torch.stack(decoder_outputs, dim=1).squeeze()
 
         # Project output to vocab
