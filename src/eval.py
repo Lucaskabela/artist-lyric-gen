@@ -72,35 +72,6 @@ def distinct_n(corpus, n=1):
 #         ppls.append(math.exp(loss))
 #     return sum(ppls) / len(ppls)
 
-# Computes the perplexity on the validation (hold out) set
-def perplexity(args, model=None):
-    corpus = utils.Corpus(args.data, args.persona_data)
-    if model is None:
-        vocab = len(corpus.dictionary)
-        model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
-        model.load_model()
-    device = model.device()
-    model.eval()
-    valid_data = utils.load_data(corpus.valid, batch_size=args.batch_size, num_workers=4)
-    avg_loss = 0
-    num_examples = 0
-    for x, x_len, p, p_len, y, y_len in valid:
-        x, x_len = x.to(device), x_len.to(device)
-        p, p_len = p.to(device), p_len.to(device)
-        y, y_len = y.to(device), y_len.to(device)
-        res = model(x, x_len, p, p_len, y, y_len)
-        pred = res[0]
-
-        eos_tensor = torch.empty(x.shape[0], 1).to(device)
-        eos_tensor.fill_(corpus.dictionary.word2idx["L"])
-        gold = torch.cat([y, eos_tensor], dim=1).long()
-        pred = pred.permute(0, 2, 1)
-        BCE = F.nll_loss(pred, gold, reduction="none", ignore_index=0)
-        print(BCE.shape)
-        avg_loss += BCE.item()
-        num_examples += y.shape[0] # Add how many examples we saw   
-    ppl = torch.exp(avg_loss / num_examples).item()
-    print(ppl)
 
 # TODO: Decide if this actually computes rhyme density, 
 

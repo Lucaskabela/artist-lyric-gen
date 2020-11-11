@@ -5,9 +5,8 @@ PURPOSE: This file defines the driving functions for the expirements/code
         of the project and contains the argparser
 """
 import argparse
-from train import train
+from train import train, perplexity
 import models
-from eval import perplexity
 
 def _parse_args():
     """
