@@ -102,7 +102,7 @@ class Corpus(object):
             res[person.id] = idxs
         return res
 
-    def tokenize(self, path, max_context=100):
+    def tokenize(self, path, max_context=60):
         """Tokenizes a text file."""
         assert os.path.exists(path)
         # Add words to the dictionary
