@@ -7,6 +7,8 @@ PURPOSE: This file defines the driving functions for the expirements/code
 import argparse
 from train import train, perplexity
 import models
+import torch
+
 
 def _parse_args():
     """
@@ -65,7 +67,8 @@ def main():
     args = _parse_args()
     # model = train(args)
     if args.eval:
-        perplexity(args)
+        with torch.no_grad():
+            perplexity(args)
 
 
 if __name__ == "__main__":
