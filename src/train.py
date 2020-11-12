@@ -133,6 +133,7 @@ def gen(args, model=None, max_len=20):
 
     generated_verses = {}
     for persona in corpus.personas:
+        print("Artist {}".format(persona))
         persona_tokens = corpus.personas[persona]
         p_len = torch.tensor([len(persona_tokens)]).long().to(device)
         p = torch.tensor([persona_tokens]).long().to(device)
@@ -160,8 +161,10 @@ def gen(args, model=None, max_len=20):
                 generated_verse.extend(out_sequence)
             artist_verses.append(generated_verse)
         generated_verses[persona] = artist_verses
-    json.dump("verses.txt", generated_verse)
+    with open("verses.json", 'w') as verses_file:
+      json.dump(generated_verses, verses_file)
 
+      
 # Computes the perplexity on the validation (hold out) set
 def perplexity(args, model=None):
     device = init_device()
