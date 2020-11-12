@@ -119,6 +119,22 @@ def eval_inference(model, corpus, valid, valid_log, global_step):
         print("generated", out_sequence)
     model.train()
     return avg_loss/num_examples
+
+def gen(args, model=None):
+    device = init_device()
+    corpus = utils.Corpus(args.data, args.persona_data)
+    if model is None:
+        vocab = len(corpus.dictionary)
+        model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
+        model.load_model()
+        model = model.to(device)
+    model.eval()
+
+    generated_verses = []
+    for persona in corpus.personas:
+        persona_tokens = persona
+        p_len = torch.tensor([len(persona_tokens)]).long().to(device)
+        p = torch.tensor([persona_tokens]).long().to(device)
 # Computes the perplexity on the validation (hold out) set
 def perplexity(args, model=None):
     device = init_device()
