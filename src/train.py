@@ -119,18 +119,20 @@ def eval_inference(model, corpus, valid, valid_log, global_step):
         print("generated", out_sequence)
     model.train()
     return avg_loss/num_examples
-
 # Computes the perplexity on the validation (hold out) set
 def perplexity(args, model=None):
+    device = init_device()
     corpus = utils.Corpus(args.data, args.persona_data)
     if model is None:
         vocab = len(corpus.dictionary)
         model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
         model.load_model()
-    device = model.device()
+        model = model.to(device)
     model.eval()
-    valid_data = utils.load_data(corpus.valid, batch_size=args.batch_size, num_workers=4)
+    valid = utils.load_data(corpus.valid, batch_size=args.batch_size, num_workers=4)
     print("Beginning eval")
+    norm_losses = []
+    norm_lens = []
     avg_loss = 0
     num_examples = 0
     for x, x_len, p, p_len, y, y_len in valid:
@@ -145,11 +147,16 @@ def perplexity(args, model=None):
         gold = torch.cat([y, eos_tensor], dim=1).long()
         pred = pred.permute(0, 2, 1)
         BCE = F.nll_loss(pred, gold, reduction="none", ignore_index=0)
-        print(BCE.shape)
-        avg_loss += BCE.item()
-        num_examples += y.shape[0] # Add how many examples we saw   
-    ppl = torch.exp(avg_loss / num_examples).item()
-    print(ppl)
+        avg_loss += torch.sum(BCE).item()
+        # Norm by length
+        norm_losses.append(torch.sum(BCE, dim=-1))
+        norm_lens.append(y_len)
+        num_examples += y.shape[0]
+    exp = torch.sum(torch.cat(norm_losses)) / torch.sum(torch.cat(norm_lens))
+    ppl = torch.exp(exp).item()
+    avg_loss = avg_loss / num_examples
+
+    print("Validation set had a perplexity of {} and an average NLL of {} per example".format(ppl, avg_loss))
 
 def train(args):
     """
