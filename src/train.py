@@ -229,6 +229,7 @@ def gen(args, model=None, max_len=15, top_p=True):
             ctxt = [1]
             # 16 bars per verse
             for _ in range(16):
+                print(ctxt)
                 out_sequence = ["S"]
                 out_tokens = []
                 x_len = torch.tensor([len(ctxt)]).long().to(device)
