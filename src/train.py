@@ -144,7 +144,6 @@ def gen(args, model=None, max_len=20):
             ctxt = [1]
             # 16 bars per verse
             for _ in range(16):
-                print(ctxt)
                 out_sequence = ["S"]
                 out_tokens = []
                 x_len = torch.tensor([len(ctxt)]).long().to(device)
@@ -155,7 +154,8 @@ def gen(args, model=None, max_len=20):
                     word = model.embedding(word)
                     outputs, hidden = model.decoder(word, hidden)
                     outputs = F.log_softmax(model.out(outputs), dim=-1)
-                    _, word = torch.max(outputs, dim=-1)
+                    # Get a random sample from output
+                    word = torch.multinomial(outputs, 1)
                     out_tokens.append(word.item())
                     out_sequence.append(corpus.dictionary.idx2word[word.item()])
                 ctxt.extend(out_tokens)
