@@ -152,11 +152,12 @@ def perplexity(args, model=None):
         norm_losses.append(torch.sum(BCE, dim=-1))
         norm_lens.append(y_len)
         num_examples += y.shape[0]
-    exp = torch.sum(torch.cat(norm_losses)) / torch.sum(torch.cat(norm_lens))
-    ppl = torch.exp(exp).item()
+    exp = torch.cat(norm_losses) / torch.cat(norm_lens)
+    ppl = torch.mean(torch.exp(exp)).item()
     avg_loss = avg_loss / num_examples
 
     print("Validation set had a perplexity of {} and an average NLL of {} per example".format(ppl, avg_loss))
+
 
 def train(args):
     """
