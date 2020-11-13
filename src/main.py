@@ -65,7 +65,7 @@ def _parse_args():
 
 def main():
     args = _parse_args()
-    # model = train(args)
+    model = train(args)
     if args.eval:
         with torch.no_grad():
             perplexity(args)
