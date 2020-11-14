@@ -47,7 +47,7 @@ class Corpus(object):
         self.test = self.tokenize(os.path.join(path, "test.json"))
         print("Done loading")
 
-    def tokenize_p_2(self, personas_path):
+    def tokenize_p_2(self, personas_path, remove_token=True):
         """
         For loading from a bpe'd text file
         """
@@ -55,8 +55,11 @@ class Corpus(object):
         idx = 1
         with open(personas_path, 'r') as personas:
             for line in personas:
-                # Put parser here
-                # line = line[]
+                if remove_token:
+                    start_token_remove = line.index('N')
+                    end_token_remove = line.index('I')
+                    line = line[0:stajkurt_token_remove] + line[end_token_remove:]
+                    print(line)
                 words = line.split()
                 for word in words:
                     self.dictionary.add_word(word)
@@ -72,7 +75,7 @@ class Corpus(object):
         res = {}
         for name in personas:
             person = personas[name]
-            
+
             if natural:
                 fn = person.to_natural_input
             else:
