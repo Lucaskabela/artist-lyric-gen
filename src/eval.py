@@ -1,10 +1,11 @@
 from nltk.translate.bleu_score import corpus_bleu
 from nltk.util import ngrams
 # from transformers import AutoTokenizer, AutoModelWithLMHead
-from dataset.dataset_utils import read_list_from_file, name_to_file_name
+
 import os
 import json
-import pronouncing
+import re
+from lyrics import Lyrics
 
 # pip install transformers
 # pip install pronouncing
@@ -29,7 +30,7 @@ def sel_bleu_artist_avg(dataset):
     dataset is a list[list[list[str]]], or a list of artist_corpus
     Returns per-artist self-bleu and dataset average
     """
-    dataset_bleu = [sel_bleu_artist(artist[:50]) for artist in dataset]
+    dataset_bleu = [sel_bleu_artist(artist) for artist in dataset]
     return dataset_bleu, sum(dataset_bleu) / len(dataset_bleu)
 
 
@@ -74,31 +75,40 @@ def distinct_n(corpus, n=1):
 
 
 # TODO: Decide if this actually computes rhyme density, 
-
-# TODO: Do artist similarity (cosine thing or crossentropy)
 def calc_rhyme_density(bars):
     """
-    This seems sus...
+    bars: list of bpe tokens
     """
-    total_syllables = 0
-    rhymed_syllables = 0
-    words_used = set([word for bar in bars for word in bar.split()])
-    for bar in bars:
-        for word in bar.split():
-            p = pronouncing.phones_for_word(word)
-            if len(p) == 0:
-                break
-            syllables = pronouncing.syllable_count(p[0])
-            total_syllables += syllables
-            has_rhyme = False
-            for rhyme in pronouncing.rhymes(word):
-                if has_rhyme:
-                    break
-                if rhyme in words_used:
-                    rhymed_syllables += syllables
-                    has_rhyme = True
-                    break
-    return rhymed_syllables/total_syllables 
+    # TODO @bill: need to do real rhyme density, import from other repo
+    text = " ".join(bars)
+    text = bpe_string_to_text(text)
+    l = Lyrics(text=text, language='en-us')
+    rl = l.get_avg_rhyme_length()
+    return rl
+
+    # total_syllables = 0
+    # rhymed_syllables = 0
+    # words_used = set([word for bar in bars for word in bar.split()])
+    # for bar in bars:
+    #     for word in bar.split():
+    #         p = pronouncing.phones_for_word(word)
+    #         if len(p) == 0:
+    #             break
+    #         syllables = pronouncing.syllable_count(p[0])
+    #         total_syllables += syllables
+    #         has_rhyme = False
+    #         for rhyme in pronouncing.rhymes(word):
+    #             if has_rhyme:
+    #                 break
+    #             if rhyme in words_used:
+    #                 rhymed_syllables += syllables
+    #                 has_rhyme = True
+    #                 break
+    # return rhymed_syllables/total_syllables 
+
+
+# TODO: Do artist similarity (cosine thing or crossentropy)
+
 
 
 def rhyme_density(corpus):
@@ -108,7 +118,7 @@ def rhyme_density(corpus):
     """
     rds = []
     for artist in corpus:
-        rds.append(sum([calc_rhyme_density(verse) for verse in artist[:50]]) / len(artist[:50]))
+        rds.append(sum([calc_rhyme_density(verse) for verse in artist]) / len(artist))
     return rds, sum(rds) / len(rds)
 
 def get_lyric_blocks(song, input_format):
@@ -118,7 +128,7 @@ def get_lyric_blocks(song, input_format):
         return [verse['lyrics'] for verse in song['verses']]
     return []
 
-def main():
+def get_artist_to_verses_marked_verses():
     songs_dir = os.path.join("./", "data", "songs", "marked_verses")
     songs_file = os.path.join(songs_dir, "_LIST")
     song_list = read_list_from_file(songs_file)
@@ -135,45 +145,41 @@ def main():
                         artist_to_verses[artists] = []
                     artist_to_verses[artists].append(lyrics)
     print("Done reading things up")
+    return artist_to_verses
+
+def bpe_string_to_text(s):
+    return re.sub(r'(@@ )|(@@ ?$)', '', s)
+
+def clean_tokens(s):
+    s = re.sub(r' L | L', '\n', s)
+    return re.sub(r'S ', '', s)
+
+def get_artist_to_verses_model_output():
+    filename = 'verses-2.json'
+    with open(filename) as openfile:
+        # this is in 
+        # {
+            # 0 (artist id): [ (verses array)
+            #     [(tokens array) a, b, c],
+            # ]
+        # }
+        songs_json = json.load(openfile) 
+    artist_to_verses = {}
+    for artist in songs_json:
+        # Remove the S and replace L with \n
+        artist_to_verses[artist] = [[token if token != 'L' else '\n' for token in list(filter(lambda x: x != 'S', verse))] for verse in songs_json[artist]]
+    return artist_to_verses
+
+def get_artist_to_verses_test():
+  return {1: [['a', 'b', 'c'], ['a' , 'z', 'b']], 2: ['hjkhkjhkjtdytr', 'asd']}
+
+def main():
+    artist_to_verses = get_artist_to_verses_model_output()
     per_artist_verses = artist_to_verses.values()
     artist = list(artist_to_verses.keys())
     rd, avg_rd = rhyme_density(per_artist_verses)
-    artist_rd_max = artist[rd.index(max(rd))]
-    artist_rd_min = artist[rd.index(min(rd))]
     s_bleu, s_bleu_avg = sel_bleu_artist_avg(per_artist_verses)
-    artist_sb_max = artist[s_bleu.index(max(s_bleu))]
-    artist_sb_min = artist[s_bleu.index(min(s_bleu))]
     distinct_1s, distinct_1_avg = distinct_n(per_artist_verses, 1)
-    artist_d1_max = artist[distinct_1s.index(max(distinct_1s))]
-    artist_d1_min = artist[distinct_1s.index(min(distinct_1s))]
     distinct_2s, distinct_2_avg = distinct_n(per_artist_verses, 2)
-    artist_d2_max = artist[distinct_2s.index(max(distinct_2s))]
-    artist_d2_min = artist[distinct_2s.index(min(distinct_2s))]
     distinct_3s, distinct_3_avg = distinct_n(per_artist_verses, 3)
-    artist_d3_max = artist[distinct_3s.index(max(distinct_3s))]
-    artist_d3_min = artist[distinct_3s.index(min(distinct_3s))]
-    with open("out.txt", 'w') as out_file:
-        out_file.write(str(artist_to_verses.keys()) + "\n")
-        out_file.write(str(rd) + "\n")
-        out_file.write("Average rhmye density is " + str(avg_rd)  + "\n")
-        out_file.write("Maximum rhmye density is " + str(max(rd))  + " by " + artist_rd_max + "\n")
-        out_file.write("Minimum rhmye density is " + str(min(rd))   + " by " + artist_rd_min + "\n")
-        out_file.write(str(s_bleu) + "\n")
-        out_file.write("Average self-bleu (4) is " + str(s_bleu_avg)  + "\n")
-        out_file.write("Maximum self-bleu (4) is " + str(max(s_bleu))  + " by " + artist_sb_max + "\n")
-        out_file.write("Minimum self-bleu (4) is " + str(min(s_bleu))  + " by " + artist_sb_min + "\n")
-        out_file.write(str(distinct_1s) + "\n")
-        out_file.write("Average distinct-1 is " + str(distinct_1_avg) + "\n")
-        out_file.write("Maximum distinct-1 is " + str(max(distinct_1s))  + " by " + artist_d1_max + "\n")
-        out_file.write("Minimum distinct-1 is " + str(min(distinct_1s))  +  " by " + artist_d1_min + "\n")
-        out_file.write(str(distinct_2s) + "\n")
-        out_file.write("Average distinct-2 is " + str(distinct_2_avg) + "\n")   
-        out_file.write("Maximum distinct-2 is " + str(max(distinct_2s))   + " by " + artist_d2_max + "\n")
-        out_file.write("Minimum distinct-2 is " + str(min(distinct_2s))  + " by " + artist_d2_min + "\n")     
-        out_file.write(str(distinct_3s) + "\n")
-        out_file.write("Average distinct-3 is " + str(distinct_3_avg) + "\n")
-        out_file.write("Maximum distinct-3 is " + str(max(distinct_3s))  + " by " + artist_d3_max + "\n")
-        out_file.write("Minimum distinct-3 is " + str(min(distinct_3s))  + " by " + artist_d3_min + "\n")
-
-if __name__ == "__main__":
-    main()
+    return (rd, s_bleu, distinct_1s, distinct_2s, distinct_3s)
