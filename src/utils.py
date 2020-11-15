@@ -56,10 +56,16 @@ class Corpus(object):
         with open(personas_path, 'r') as personas:
             for line in personas:
                 if remove_token:
+<<<<<<< HEAD
                     start_token_remove = line.index('N')
                     end_token_remove = line.index('I')
                     line = line[0:stajkurt_token_remove] + line[end_token_remove:]
                     print(line)
+=======
+                    start_token_remove = line.index('R')
+                    end_token_remove = line.index('C')
+                    line = line[0:start_token_remove] + line[end_token_remove:]
+>>>>>>> Try no real name now
                 words = line.split()
                 for word in words:
                     self.dictionary.add_word(word)
