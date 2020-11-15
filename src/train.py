@@ -192,7 +192,7 @@ def train(args):
             p, p_len = p.to(device), p_len.to(device)
             y, y_len = y.to(device), y_len.to(device)
             # Should go from 1 to 0 of ~100k steps (after learned good LM)
-            teach = 1 if global_step < 200_000 else .995
+            teach = 1 if global_step < 200_000 else .9995
             res = model(x, x_len, p, p_len, y, y_len, teach)
             pred, bow_log, r_mu, r_log_var, p_mu, p_log_var = res
 
