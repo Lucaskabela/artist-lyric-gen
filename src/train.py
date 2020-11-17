@@ -14,7 +14,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.tensorboard as tb
-
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
 
 
 def gaussian_kld(recog_mu, recog_logvar, prior_mu, prior_logvar):
@@ -120,6 +121,52 @@ def eval_inference(model, corpus, valid, valid_log, global_step):
         print("generated", out_sequence)
     model.train()
     return avg_loss/num_examples
+
+def twod_viz(args, model=None):
+    device = init_device()
+    corpus = utils.Corpus(args.data, args.persona_data)
+    if model is None:
+        vocab = len(corpus.dictionary)
+        model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
+        model.load_model()
+        model = model.to(device)
+    model.eval()
+    artist_list = [1, 2, 3]
+    latents = []
+    for artist in artist_list:
+        labels = []
+        curr = []
+        persona = corpus.personas[artist]
+        print("Artist {}".format(artist))        
+        out_sequence = ["S"]
+        out_tokens = []
+        p_len = torch.tensor([len(persona_tokens)]).long().to(device)
+        p = torch.tensor([persona_tokens]).long().to(device)
+        x_len = torch.tensor([len(ctxt)]).long().to(device)
+        x = torch.tensor([ctxt]).long().to(device)
+        for i in range(10):
+            # Get 10 samples of latent space
+            hidden = model.infer_hidden(x, x_len, p, p_len)
+            hidden = hidden.cpu().numpy()
+            curr.append(hidden)
+            labels.append(artist)
+        latents.append(np.concatenate(curr))
+    latents = np.concatenate(latents)
+    labels = np.array(labels)
+    pca = PCA(n_components=2)
+    latent_pca = pca.fit_transform(latents)
+    for idx, cl in enumerate(np.unique(y)):
+        plt.scatter(x=X[y == cl, 0], 
+                    y=X[y == cl, 1],
+                    alpha=0.6, 
+                    c=[cmap(idx)],
+                    edgecolor='black',
+                    marker=markers[idx], 
+                    label=cl)
+    plt.xlabel('PC 1')
+    plt.ylabel('PC 2')
+    plt.legend(loc='lower left')
+    plt.show()
 
 def gen(args, model=None, max_len=20):
     device = init_device()
