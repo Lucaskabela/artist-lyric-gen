@@ -43,7 +43,10 @@ class BaseNetwork(nn.Module):
         )
 
     def num_params(self):
-        pytorch_total_params = sum(p.numel() for p in self.parameters())
+        pytorch_total_params = 0
+        for p in self.parameters():
+            if p.requires_grad:
+                pytorch_total_params += p.numel()
         print(pytorch_total_params)
 
 class GhostLSTM(BaseNetwork):
