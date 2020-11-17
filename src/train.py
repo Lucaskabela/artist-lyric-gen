@@ -119,6 +119,7 @@ def eval_inference(model, corpus, valid, valid_log, global_step):
         print("generated", out_sequence)
     model.train()
     return avg_loss/num_examples
+
 # Computes the perplexity on the validation (hold out) set
 def perplexity(args, model=None):
     device = init_device()
