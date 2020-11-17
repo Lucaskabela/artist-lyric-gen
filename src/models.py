@@ -43,8 +43,33 @@ class BaseNetwork(nn.Module):
         )
 
     def num_params(self):
-        total_params = sum(reduce( lambda a, b: a*b, x.size()) for x in self.parameters())
-        print("Training", total_params, "params")
+        pytorch_total_params = sum(p.numel() for p in self.parameters())
+        print(pytorch_total_params)
+
+class GhostLSTM(BaseNetwork):
+    """
+    Defines the LSTM model based onGhostWriter Potash et al. 2015
+    """
+
+    def __init__(self, vocab_size, embedding_dim, hidden_size, name="ghost"):
+
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.name = name
+        self.embedding = nn.Embedding(self.vocab_size, embedding_dim)
+        nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
+        # TODO: add args for
+        self.encoder = nn.LSTM(embedding_dim, hidden_size)
+        self.decoder = nn.LSTM(hidden_size, self.vocab_size)
+
+    def forward(self, context):
+        """
+        Given a padded batch of input, with dimension [batch x seq_len],
+        embeds & then passed through the network, producing [batch x out_len]
+        where the output length is padded with <PAD>
+        """
+        pass
+
 
 class CVAE(BaseNetwork):
     """
@@ -99,8 +124,8 @@ class CVAE(BaseNetwork):
 
             self.y_encoder = nn.GRU(
                 emb_dim, hidden_size, bidirectional=True, batch_first=True
-            )           
- 
+            )
+
         self.recognition = nn.Linear(hidden_size * 6, hidden_size * 2)
         self.r_mu_log_var = nn.Linear(hidden_size * 2, latent_dim * 2)
 

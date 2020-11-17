@@ -320,7 +320,7 @@ def train(args):
     if args.continue_training:
         model.load_model()
     model = model.to(device)
-
+    print("Training", model.name, "with #params:", model.parameters)
     loss = cvae_loss_function
     best = float("inf")
     global_step = 0
