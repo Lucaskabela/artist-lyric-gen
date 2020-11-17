@@ -16,7 +16,8 @@ import torch.nn.functional as F
 import torch.utils.tensorboard as tb
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
-
+import matplotlib.cmx as cmx
+import matplotlib.colors as colors
 
 def gaussian_kld(recog_mu, recog_logvar, prior_mu, prior_logvar):
     kld = -0.5 * (1 + (recog_logvar - prior_logvar)
@@ -127,46 +128,67 @@ def twod_viz(args, model=None):
     corpus = utils.Corpus(args.data, args.persona_data)
     if model is None:
         vocab = len(corpus.dictionary)
-        model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
+        model = models.CVAE(vocab, args.embedding, args.hidden, args.latent, rnn=args.rnn)
         model.load_model()
         model = model.to(device)
     model.eval()
-    artist_list = [1, 2, 3]
+    # colors = ['red', 'green', 'cyan', 'blue', 'purple', 'yellow', 'black', 'orange', 'indigo', 'grey']
+    artist_names = ["21 savage", '6ix9ine', 'dr dre', 'earl sweatshirt', 'ice cube', 'kayne west', 'kendrick lamar', 'kid cudi', 'pusha t', 'tyler the creator',]
+    artist_list = [2, 5, 23, 26, 36, 44, 46, 47, 67, 86]
+    names = {}
+    for name, id_ in zip(artist_names, artist_list):
+      names[id_] = name
     latents = []
+    labels = []
     for artist in artist_list:
-        labels = []
         curr = []
         persona = corpus.personas[artist]
         print("Artist {}".format(artist))        
-        out_sequence = ["S"]
-        out_tokens = []
-        p_len = torch.tensor([len(persona_tokens)]).long().to(device)
-        p = torch.tensor([persona_tokens]).long().to(device)
+        ctxt = ['S', 'the', 'greatest', 'rapper', 'of', 'all', 'time']
+        ctxt = [corpus.dictionary.word2idx[word] for word in ctxt]
+        p_len = torch.tensor([len(persona)]).long().to(device)
+        p = torch.tensor([persona]).long().to(device)
         x_len = torch.tensor([len(ctxt)]).long().to(device)
         x = torch.tensor([ctxt]).long().to(device)
-        for i in range(10):
+        x_emb = model.embedding(x)
+        p_emb = model.embedding(p)
+
+        c_enc = model.contextualize(x_emb, x_len, p_emb, p_len)
+        out_prior = model.priorlnorm(model.tanh(model.prior(c_enc)))
+        p = model.p_mu_log_var(out_prior)
+        p_mu, p_log_var = torch.split(p, model.latent_dim, dim=-1)
+        # latents.append(p_mu.cpu().numpy().squeeze())
+        # labels.append(artist)
+        for i in range(3):
             # Get 10 samples of latent space
-            hidden = model.infer_hidden(x, x_len, p, p_len)
-            hidden = hidden.cpu().numpy()
-            curr.append(hidden)
+            z = model.reparameterize(p_mu, p_log_var)
+            z = z.cpu().numpy().squeeze()
+            curr.append(z)
             labels.append(artist)
-        latents.append(np.concatenate(curr))
+        latents.append(np.stack(curr))
     latents = np.concatenate(latents)
+    print(latents.shape)
     labels = np.array(labels)
+    print(labels.shape)
     pca = PCA(n_components=2)
     latent_pca = pca.fit_transform(latents)
-    for idx, cl in enumerate(np.unique(y)):
-        plt.scatter(x=X[y == cl, 0], 
-                    y=X[y == cl, 1],
-                    alpha=0.6, 
-                    c=[cmap(idx)],
+    # cm = plt.get_cmap('gist_rainbow')
+    fig = plt.figure()
+    jet = cm = plt.get_cmap('gist_rainbow') 
+    cNorm  = colors.Normalize(vmin=0, vmax=10)
+    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=jet)
+    for idx, cl in enumerate(np.unique(labels)):
+        plt.scatter(x=latent_pca[labels == cl, 0], 
+                    y=latent_pca[labels == cl, 1],
+                    alpha=0.6,
+                    color=scalarMap.to_rgba(idx), 
                     edgecolor='black',
-                    marker=markers[idx], 
-                    label=cl)
+                    label=names[cl])
     plt.xlabel('PC 1')
     plt.ylabel('PC 2')
-    plt.legend(loc='lower left')
+    plt.legend(bbox_to_anchor=(1.25, 1.05), loc='upper right')
     plt.show()
+    fig.savefig('my_figure.png')
 
 def gen(args, model=None, max_len=20):
     device = init_device()
