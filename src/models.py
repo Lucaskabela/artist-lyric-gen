@@ -47,26 +47,81 @@ class GhostLSTM(BaseNetwork):
     """
     Defines the LSTM model based onGhostWriter Potash et al. 2015
     """
+    def __init__(
+        self,
+        vocab,
+        emb_dim,
+        hidden_size,
+        drop=0.1,
+        name="ghost",
+    ):
 
-    def __init__(self, vocab_size, embedding_dim, hidden_size, name="ghost"):
-
-        super().__init__()
-        self.vocab_size = vocab_size
+        super(VAE, self).__init__()
+        self.vocab_size = vocab
+        self.emb_dim = emb_dim
+        self.hidden_size = hidden_size
         self.name = name
-        self.embedding = nn.Embedding(self.vocab_size, embedding_dim)
+
+        self.embedding = nn.Embedding(self.vocab_size, emb_dim)
         nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
-        # TODO: add args for
-        self.encoder = nn.LSTM(embedding_dim, hidden_size)
-        self.decoder = nn.LSTM(hidden_size, self.vocab_size)
+        self.dropout = nn.Dropout(p=drop)
+        # X and P will be encoded then concatenated
+        if rnn == "lstm":
+            self.encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
+        elif rnn == "gru":
+            self.encoder = nn.GRU(emb_dim, hidden_size, bidirectional=True, batch_first=True)
 
-    def forward(self, context):
-        """
-        Given a padded batch of input, with dimension [batch x seq_len],
-        embeds & then passed through the network, producing [batch x out_len]
-        where the output length is padded with <PAD>
-        """
-        pass
+        self.tanh = torch.tanh
+        self.lnorm = nn.LayerNorm(hidden_size * 2)
+        self.hidden_transform = nn.Linear(hidden_size*2, hidden_size)
+        self.hidden_dropout = nn.Dropout(p=drop)
 
+        if rnn == "lstm":
+            self.decoder = nn.LSTM(emb_dim,  hidden_size, batch_first=True)
+        elif rnn == "gru":
+            self.decoder = nn.GRU(emb_dim,  hidden_size, batch_first=True)
+        else:
+            raise Exception("RNN type {} is not supported".format(rnn))
+
+        self.out = nn.Linear(hidden_size, self.vocab_size)
+        self.log_softmax = nn.LogSoftmax(dim=-1)
+
+    def forward(self, x, x_len, y, y_len):
+
+        x_emb = self.emb_dropout(self.embedding(x))
+        y_emb = self.emb_dropout(self.embedding(y))
+
+        # For efficency, sort and pack x, then encode!
+        sorted_x_lengths, sorted_x_idx = torch.sort(x_length, descending=True)
+        x_emb = x_emb[sorted_x_idx]
+        packed_x = pack_padded_sequence(
+            x_emb, sorted_x_lengths.data.tolist(), batch_first=True
+        )
+        x_h, x_hn = self.encoder(packed_x)
+        if self.rnn == "lstm":
+            # Disregard the cell if lstm
+            x_hn = x_hn[0]
+        x_enc = torch.cat([x_hn[0], x_hn[1]], dim=-1)
+        ctxt = self.hidden_dropout(self.lnorm(self.tanh(self.hidden_transform(x_enc))))
+
+
+        SOS = torch.ones(y.shape[0], 1).long().to(self.device())
+        SOS = self.emb_dropout(self.embedding(SOS))
+        teacher_force = torch.cat([SOS, y_emb], dim=1)
+        y_lengths = torch.LongTensor([y + 1 for y in y_lens]).to(self.device())
+        sorted_lengths, sorted_idx = torch.sort(y_lengths, descending=True)
+        y = y[sorted_idx]
+        packed_y = pack_padded_sequence(
+            y, sorted_lengths.data.tolist(), batch_first=True
+        )
+        output, hidden = self.decoder(packed_y, to_decode)
+        # Unpack and then return to original order
+        padded_outputs = pad_packed_sequence(output, batch_first=True)[0]
+        _, reversed_idx = torch.sort(sorted_idx)
+        padded_outputs = padded_outputs[reversed_idx]
+        # Project output to vocab
+        output = self.log_softmax(self.out(padded_outputs))
+        return output
 
 class CVAE(BaseNetwork):
     """
@@ -303,7 +358,7 @@ class CVAE(BaseNetwork):
 
 class VAE(BaseNetwork):
     """
-    Defines the CVAE approach, using LSTMs as Encoder/Decoder
+    Defines the VAE approach, using RNNs as Encoder/Decoder
     """
 
     def __init__(
@@ -313,6 +368,7 @@ class VAE(BaseNetwork):
         hidden_size,
         latent_dim,
         drop=0.1,
+        rnn="lstm",
         name="vae",
     ):
 
@@ -322,23 +378,34 @@ class VAE(BaseNetwork):
         self.hidden_size = hidden_size
         self.latent_dim = latent_dim
         self.name = name
+        self.rnn = rnn
 
         self.embedding = nn.Embedding(self.vocab_size, emb_dim)
         nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
         self.dropout = nn.Dropout(p=drop)
+        self.recoglnorm = nn.LayerNorm(hidden_size * 2)
 
-        # self.c_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True)
-        self.x_encoder = nn.LSTM(
-            emb_dim, hidden_size, bidirectional=True, batch_first=True
-        )
+        # X and P will be encoded then concatenated
+        if rnn == "lstm":
+            self.x_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
+        elif rnn == "gru":
+            self.x_encoder = nn.GRU(emb_dim, hidden_size, bidirectional=True, batch_first=True)
+
         self.recognition = nn.Linear(hidden_size * 2, hidden_size * 2)
-        self.mu = nn.Linear(hidden_size * 2, latent_dim)
-        self.log_var = nn.Linear(hidden_size * 2, latent_dim)
+        self.r_mu_log_var = nn.Linear(hidden_size * 2, latent_dim * 2)
 
         # Make this latent + hidden (?)
         self.latent2hidden = nn.Linear(latent_dim, hidden_size)
-        self.decoder = nn.LSTM(emb_dim, hidden_size, batch_first=True)
-        self.out = nn.Linear(hidden_size, self.vocab_size)
+
+        if rnn == "lstm":
+            self.decoder = nn.LSTM(emb_dim,  hidden_size, batch_first=True)
+        elif rnn == "gru":
+            self.decoder = nn.GRU(emb_dim,  hidden_size, batch_first=True)
+        else:
+            raise Exception("RNN type {} is not supported".format(rnn))
+
+        self.out = nn.Linear( hidden_size, self.vocab_size)
+        self.log_softmax = nn.LogSoftmax(dim=-1)
 
     def encode(self, x_emb, x_length):  # Produce Q(z | x, c)
         """
@@ -355,8 +422,9 @@ class VAE(BaseNetwork):
         x_enc = torch.cat([x_hn[0], x_hn[1]], dim=-1)
 
         out_rec = torch.tanh(self.recognition(x_enc))
-        mu, log_var = self.mu(out_rec), self.log_var(out_rec)
-        return mu, log_var
+        r = self.latent_dropout(self.r_mu_log_var(out_rec))
+        r_mu, r_log_var = torch.split(r, self.latent_dim, dim=-1)
+        return r_mu, r_log_var
 
     def reparameterize(self, mu, log_var):
         """
@@ -387,7 +455,7 @@ class VAE(BaseNetwork):
         padded_outputs = padded_outputs[reversed_idx]
 
         # Project output to vocab
-        output = F.log_softmax(self.out(padded_outputs), dim=-1)
+        output = self.log_softmax(self.out(padded_outputs), dim=-1)
         return output
 
     def forward(self, x, x_lengths):
@@ -400,7 +468,10 @@ class VAE(BaseNetwork):
         # Handle formatting the latent properly for LSTM
         z = self.reparameterize(mu, log_var)
         hidden = self.latent2hidden(z)
-        hidden = (hidden.unsqueeze(0), hidden.unsqueeze(0))
+        if self.rnn == "lstm":
+            to_decode = (hidden.unsqueeze(0), hidden.unsqueeze(0))
+        else:
+            to_decode = hidden
 
         # Teacher forcing here - Preppend SOS token
         SOS = torch.ones(x.shape[0], 1).long().to(self.device())
