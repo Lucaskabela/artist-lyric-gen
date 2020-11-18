@@ -213,7 +213,7 @@ def top_p_filtering(logits, top_p=0.9, filter_value=-float('Inf')):
     return logits
 
 
-def gen(args, model=None, max_len=20, top_p=False):
+def gen(args, model=None, max_len=15, top_p=False):
     device = init_device()
     corpus = utils.Corpus(args.data, args.persona_data)
     if model is None:
@@ -245,11 +245,13 @@ def gen(args, model=None, max_len=20, top_p=False):
                 while out_sequence[-1] != "L" and len(out_sequence) < max_len:
                     word = model.embedding(word)
                     outputs, hidden = model.decoder(word, hidden)
-                    outputs = F.log_softmax(model.out(outputs), dim=-1)
+                    outputs = F.log_softmax(model.out(outputs), dim=-1).squeeze()
                     if top_p:
-                        outputs = top_p_filtering(outputs.squeeze())
+                        outputs = top_p_filtering(outputs).unsqueeze(0)
+                    else:
+                        outputs = outputs.unsqueeze(0)
                     # Get a random sample from output
-                    word = torch.multinomial(outputs, 1)
+                    word = torch.multinomial(F.softmax(outputs), 1)
                     out_tokens.append(word.item())
                     out_sequence.append(corpus.dictionary.idx2word[word.item()])
                 ctxt.extend(out_tokens)
