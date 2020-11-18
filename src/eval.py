@@ -7,8 +7,7 @@ import json
 import re
 import subprocess
 import locale
-from tqdm import tqdm
-from lyrics import Lyrics
+from tqdm import tqdm, trange
 
 # pip install transformers
 # pip install pronouncing
@@ -16,9 +15,9 @@ from lyrics import Lyrics
 # Self -bleu measures diversity between verse
 # Distinct-n measures diversity in a verse
 
-loading_bar = None
-
 NUM_ARTISTS = 91
+# ****REMEMBER: need to change this to the right location
+RHYME_ANALYZER_JAR = 'rhymeanalyzer/RhymeApp/dist/RhymeApp.jar'
 
 def sel_bleu_artist(artist_corpus):
     '''
@@ -32,12 +31,16 @@ def sel_bleu_artist(artist_corpus):
         hypotheses.append(artist_corpus[i])
     return corpus_bleu(list_of_references, hypotheses)
 
-def sel_bleu_artist_avg(dataset):
+def sel_bleu_artist_avg(dataset, file_prefix):
     """
     dataset is a list[list[list[str]]], or a list of artist_corpus
     Returns per-artist self-bleu and dataset average
     """
-    dataset_bleu = [sel_bleu_artist(artist) for artist in dataset]
+    dataset_bleu = []
+    for artist in dataset:
+        artist_bleu = sel_bleu_artist(artist)
+        append_stat_to_txt_file("{}_sbleu".format(file_prefix), artist_bleu)
+        dataset_bleu.append(artist_bleu)
     return dataset_bleu, sum(dataset_bleu) / len(dataset_bleu)
 
 
@@ -60,12 +63,16 @@ def distinct_n_artist(artist_corpus, n=1):
     verses_d = [distinct_n_verse(verse, n) for verse in artist_corpus]
     return sum(verses_d) / len(artist_corpus)
 
-def distinct_n(corpus, n=1):
+def distinct_n(corpus, n=1, file_prefix=''):
     """
     Corpus is list[list[list[str]]], or a list of artist-verses
     Returns list of artist distinct-n and average
     """
-    artist_d = [distinct_n_artist(artist, n) for artist in corpus]
+    artist_d = []
+    for artist in corpus:
+        artist_d_n = distinct_n_artist(artist, n)
+        append_stat_to_txt_file("{}_d{}".format(file_prefix, n), artist_d_n)
+        artist_d.append(artist_d_n)
     return artist_d, sum(artist_d) / len(corpus)
 
 # def perplexity_artist(artist_corpus, tokenizer, model):
@@ -80,15 +87,24 @@ def distinct_n(corpus, n=1):
 #         ppls.append(math.exp(loss))
 #     return sum(ppls) / len(ppls)
 
-
-# TODO: Decide if this actually computes rhyme density,
 def calc_rhyme_density(bars):
     """
     bars: list of bpe tokens
     """
+    def clean_lines(s):
+        # Removes extra lines, and strips lines
+        lines = [line.strip() for line in s.split('\n')]
+        lines = list(filter(lambda s: s != '', lines))
+        # reconstruct the lines together
+        cleaned_lyrics = ''
+        for line in lines:
+            # concat lines together and add the end line token back
+            cleaned_lyrics = cleaned_lyrics + line + '\n'
+        return cleaned_lyrics
     text = " ".join(bars).strip()
     text = bpe_string_to_text(text)
-    params = ['java', '-jar', 'rhymeanalyzer/RhymeApp/dist/RhymeApp.jar', text]
+    text = clean_lines(text)
+    params = ['java', '-jar', RHYME_ANALYZER_JAR, text]
     output = subprocess.check_output(params)
 
     # convert to string
@@ -105,15 +121,14 @@ def calc_rhyme_density(bars):
             result[key] = value
 
     statistics = result
-    return statistics['Rhyme_Density']
+    return statistics['Rhyme_Density'] if 'Rhyme_Density' in statistics else 0
 
-def dope_learning_rhyme_scores(bars):
-    # TODO @bill: need to do real rhyme density, import from other repo
-    text = " ".join(bars)
-    text = bpe_string_to_text(text)
-    l = Lyrics(text=text, language='en-us')
-    rl = l.get_avg_rhyme_length()
-    return rl
+# def dope_learning_rhyme_scores(bars):
+#     text = " ".join(bars)
+#     text = bpe_string_to_text(text)
+#     l = Lyrics(text=text, language='en-us')
+#     rl = l.get_avg_rhyme_length()
+#     return rl
 
 # def naive_rhyme_density(bars):
 #     total_syllables = 0
@@ -139,18 +154,16 @@ def dope_learning_rhyme_scores(bars):
 
 # TODO: Do artist similarity (cosine thing or crossentropy)
 
-def rhyme_density(corpus):
+def rhyme_density(corpus, file_prefix):
     """
     Corpus is list[list[list[str]]], or a list of artist-verses
     Returns list of artist distinct-n and average
     """
     print("\n===== COMPUTING RD =====\n")
     rds = []
-    global loading_bar
-    loading_bar = tqdm(corpus)
-    for artist in loading_bar:
+    for artist in tqdm(corpus):
         artist_rd = sum([calc_rhyme_density(verse) for verse in tqdm(artist)]) / len(artist)
-        loading_bar.write(str(artist_rd))
+        append_stat_to_txt_file("{}_rd".format(file_prefix), artist_rd)
         rds.append(artist_rd)
     return rds, sum(rds) / len(rds)
 
@@ -196,8 +209,7 @@ def replace_start_with_new_line_from_list(l):
 def remove_end_tokens_from_list(l):
     return list(filter(lambda x: x != 'L', l))
 
-def get_artist_to_verses_model_output():
-    filename = 'verses-2.json'
+def get_artist_to_verses_model_output(filename):
     with open(filename) as openfile:
         # this is in
         # {
@@ -216,8 +228,7 @@ def get_artist_to_verses_model_output():
         artist_to_verses[artist_index] = [replace_start_with_new_line_from_list(remove_end_tokens_from_list(verse)) for verse in songs_json[artist]]
     return artist_to_verses
 
-def get_artist_to_verses_dataset():
-    filename = 'dataset/train.json'
+def get_artist_to_verses_dataset(filename):
     with open(filename) as openfile:
         # {artist_id: ,
         # lyrics: <string>}
@@ -234,26 +245,36 @@ def get_artist_to_verses_dataset():
     return artist_to_verses
 
 def get_artist_to_verses_test():
-  return {1: [['a', 'b', 'c'], ['a' , 'z', 'b']], 2: ['hjkhkjhkjtdytr', 'asd']}
+  return [[['a', 'b', 'c'], ['a' , 'z', 'b']], ['hjkhkjhkjtdytr', 'asd']]
+
+def append_stat_to_txt_file(filename, stat):
+    with open("{}.txt".format(filename), 'a') as openfile:
+        openfile.write(str(stat))
+        openfile.write('\n')
 
 def write_out_stats_to_file(filename, stats_list):
-    with open(filename) as openfile:
+    with open(filename, 'a') as openfile:
         json.dump(stats_list, openfile)
 
-def main(file_prefix):
-    artist_to_verses = get_artist_to_verses_dataset()
+def main(file_prefix, read_file_name):
+    """
+    the files will be of the form <file_prefix>_<metric>.txt
+    """
+    # ****REMEMBER: you might need to change this to the correct function to
+    # format rhyme density, most likely will be something like
+    # get_artist_to_verses_model_output(<some file name>)
+    # you may have to write your own function if the format is different from
+    # the assumed format in that function
+    artist_to_verses = get_artist_to_verses_dataset(read_file_name)
     per_artist_verses = artist_to_verses
-    rd, avg_rd = rhyme_density(per_artist_verses)
-    write_out_stats_to_file('{}_rd.json'.format(file_prefix), rd)
-    s_bleu, s_bleu_avg = sel_bleu_artist_avg(per_artist_verses)
-    write_out_stats_to_file('{}_sbleu.json'.format(file_prefix), s_bleu)
-    distinct_1s, distinct_1_avg = distinct_n(per_artist_verses, 1)
-    write_out_stats_to_file('{}_d1.json'.format(file_prefix), distinct_1s)
-    distinct_2s, distinct_2_avg = distinct_n(per_artist_verses, 2)
-    write_out_stats_to_file('{}_d2.json'.format(file_prefix), distinct_2s)
-    distinct_3s, distinct_3_avg = distinct_n(per_artist_verses, 3)
-    write_out_stats_to_file('{}_d3.json'.format(file_prefix), distinct_3s)
+    rd, avg_rd = rhyme_density(per_artist_verses, file_prefix)
+    # ****REMEMBER: COMMENT THIS STUFF BELOW OUT IF YOU'RE ONLY DOING RHYME DENSITY
+    s_bleu, s_bleu_avg = sel_bleu_artist_avg(per_artist_verses, file_prefix)
+    distinct_1s, distinct_1_avg = distinct_n(per_artist_verses, 1, file_prefix)
+    distinct_2s, distinct_2_avg = distinct_n(per_artist_verses, 2, file_prefix)
+    distinct_3s, distinct_3_avg = distinct_n(per_artist_verses, 3, file_prefix)
     return (rd, s_bleu, distinct_1s, distinct_2s, distinct_3s)
 
 if __name__ == "__main__":
-    main('train_dataset')
+    # ****REMEMBER: change the file name if necessary
+    main('train_dataset', 'dataset/train.json')
