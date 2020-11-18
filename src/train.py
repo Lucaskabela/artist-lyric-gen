@@ -16,7 +16,7 @@ import torch.nn.functional as F
 import torch.utils.tensorboard as tb
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
-import matplotlib.cmx as cmx
+import matplotlib.cm as cmx
 import matplotlib.colors as colors
 
 def gaussian_kld(recog_mu, recog_logvar, prior_mu, prior_logvar):
@@ -190,7 +190,30 @@ def twod_viz(args, model=None):
     plt.show()
     fig.savefig('my_figure.png')
 
-def gen(args, model=None, max_len=20):
+def top_p_filtering(logits, top_p=0.9, filter_value=-float('Inf')):
+    """ Filter a distribution of logits using top-k and/or nucleus (top-p) filtering
+        Modified from: https://gist.github.com/thomwolf/1a5a29f6962089e871b94cbd09daf317
+        Args:
+            logits: logits distribution shape (vocabulary size)
+            top_p >0.0: keep the top tokens with cumulative probability >= top_p (nucleus filtering).
+                Nucleus filtering is described in Holtzman et al. (http://arxiv.org/abs/1904.09751)
+    """
+    assert logits.dim() == 1  # batch size 1 for now - could be updated for more but the code would be less clear
+    sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+    cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+    # Remove tokens with cumulative probability above the threshold
+    sorted_indices_to_remove = cumulative_probs > top_p
+    # Shift the indices to the right to keep also the first token above the threshold
+    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+    sorted_indices_to_remove[..., 0] = 0
+
+    indices_to_remove = sorted_indices[sorted_indices_to_remove]
+    logits[indices_to_remove] = filter_value
+    return logits
+
+
+def gen(args, model=None, max_len=20, top_p=False):
     device = init_device()
     corpus = utils.Corpus(args.data, args.persona_data)
     if model is None:
@@ -223,6 +246,8 @@ def gen(args, model=None, max_len=20):
                     word = model.embedding(word)
                     outputs, hidden = model.decoder(word, hidden)
                     outputs = F.log_softmax(model.out(outputs), dim=-1)
+                    if top_p:
+                        outputs = top_p_filtering(outputs.squeeze())
                     # Get a random sample from output
                     word = torch.multinomial(outputs, 1)
                     out_tokens.append(word.item())
