@@ -16,7 +16,7 @@ import torch.nn.functional as F
 import torch.utils.tensorboard as tb
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
-import matplotlib.cmx as cmx
+import matplotlib.cm as cmx
 import matplotlib.colors as colors
 
 def gaussian_kld(recog_mu, recog_logvar, prior_mu, prior_logvar):
