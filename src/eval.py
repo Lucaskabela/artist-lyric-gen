@@ -214,7 +214,7 @@ def get_artist_to_verses_test():
 
 def write_out_stats_to_file(filename, stats_list):
     with open(filename) as openfile:
-        json.dump(stats_list, filename)
+        json.dump(stats_list, openfile)
 
 def main(file_prefix):
     artist_to_verses = get_artist_to_verses_model_output()
