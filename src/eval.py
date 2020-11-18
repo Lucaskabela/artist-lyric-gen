@@ -18,6 +18,8 @@ from lyrics import Lyrics
 
 loading_bar = None
 
+NUM_ARTISTS = 91
+
 def sel_bleu_artist(artist_corpus):
     '''
     Corpus is a list[list[str]], which is a list of verses.  Use to compute self-bleu
@@ -86,8 +88,6 @@ def calc_rhyme_density(bars):
     """
     text = " ".join(bars).strip()
     text = bpe_string_to_text(text)
-    # need to add quotes to the argument
-    text = '"' + text + '"'
     params = ['java', '-jar', 'rhymeanalyzer/RhymeApp/dist/RhymeApp.jar', text]
     output = subprocess.check_output(params)
 
@@ -149,7 +149,7 @@ def rhyme_density(corpus):
     global loading_bar
     loading_bar = tqdm(corpus)
     for artist in loading_bar:
-        artist_rd = sum([calc_rhyme_density(verse) for verse in artist]) / len(artist)
+        artist_rd = sum([calc_rhyme_density(verse) for verse in tqdm(artist)]) / len(artist)
         loading_bar.write(str(artist_rd))
         rds.append(artist_rd)
     return rds, sum(rds) / len(rds)
@@ -188,7 +188,10 @@ def clean_tokens(s):
     return re.sub(r'S ', '', s)
 
 def replace_start_with_new_line_from_list(l):
-    return [token if token != 'S' else '\n' for token in l]
+    new_tokens = [token if token != 'S' else '\n' for token in l]
+    if new_tokens[0] == '\n':
+        new_tokens = new_tokens[1:]
+    return new_tokens
 
 def remove_end_tokens_from_list(l):
     return list(filter(lambda x: x != 'L', l))
@@ -203,10 +206,31 @@ def get_artist_to_verses_model_output():
             # ]
         # }
         songs_json = json.load(openfile)
-    artist_to_verses = {}
+    artist_to_verses = []
+    # instantiate list of lists, verses of artists
+    for _ in range(0, NUM_ARTISTS):
+        artist_to_verses.append([])
     for artist in songs_json:
-        # Remove the S and replace L with \n
-        artist_to_verses[artist] = [replace_start_with_new_line_from_list(remove_end_tokens_from_list(verse)) for verse in songs_json[artist]]
+        artist_index = int(artist) - 1
+        # Remove the L and replace S with \n
+        artist_to_verses[artist_index] = [replace_start_with_new_line_from_list(remove_end_tokens_from_list(verse)) for verse in songs_json[artist]]
+    return artist_to_verses
+
+def get_artist_to_verses_dataset():
+    filename = 'dataset/train.json'
+    with open(filename) as openfile:
+        # {artist_id: ,
+        # lyrics: <string>}
+        verses_json = json.load(openfile)
+    artist_to_verses = []
+    # instantiate list of lists, verses of artists
+    for _ in range(0, NUM_ARTISTS):
+        artist_to_verses.append([])
+    for verse in verses_json:
+        artist_index = int(verse['artist_id']) - 1
+        lyrics_tokens = verse['lyrics'].split(' ')
+        cleaned_tokens = replace_start_with_new_line_from_list(remove_end_tokens_from_list(lyrics_tokens))
+        artist_to_verses[artist_index].append(cleaned_tokens)
     return artist_to_verses
 
 def get_artist_to_verses_test():
@@ -217,9 +241,8 @@ def write_out_stats_to_file(filename, stats_list):
         json.dump(stats_list, openfile)
 
 def main(file_prefix):
-    artist_to_verses = get_artist_to_verses_model_output()
-    per_artist_verses = artist_to_verses.values()
-    artist = list(artist_to_verses.keys())
+    artist_to_verses = get_artist_to_verses_dataset()
+    per_artist_verses = artist_to_verses
     rd, avg_rd = rhyme_density(per_artist_verses)
     write_out_stats_to_file('{}_rd.json'.format(file_prefix), rd)
     s_bleu, s_bleu_avg = sel_bleu_artist_avg(per_artist_verses)
@@ -229,7 +252,7 @@ def main(file_prefix):
     distinct_2s, distinct_2_avg = distinct_n(per_artist_verses, 2)
     write_out_stats_to_file('{}_d2.json'.format(file_prefix), distinct_2s)
     distinct_3s, distinct_3_avg = distinct_n(per_artist_verses, 3)
-    write_out_stats_to_file('{}_d2.json'.format(file_prefix), distinct_3s)
+    write_out_stats_to_file('{}_d3.json'.format(file_prefix), distinct_3s)
     return (rd, s_bleu, distinct_1s, distinct_2s, distinct_3s)
 
 if __name__ == "__main__":
