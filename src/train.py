@@ -213,7 +213,7 @@ def top_p_filtering(logits, top_p=0.9, filter_value=-float('Inf')):
     return logits
 
 
-def gen(args, model=None, max_len=15, top_p=False):
+def gen(args, model=None, max_len=15, top_p=True):
     device = init_device()
     corpus = utils.Corpus(args.data, args.persona_data)
     if model is None:
