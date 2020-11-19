@@ -171,17 +171,31 @@ def rhyme_density(corpus, file_prefix):
     return rds, sum(rds) / len(rds)
 
 def calc_tfidf_score(gen_artist, vocab, dataset_artist):
-    vectorizer = TfidfVectorizer(vocabulary = vocab)
+    artist_dataset_verses_as_strings = [clean_lines(' '.join(verse)) for verse in dataset_artist]
+    # combining all dataset lyrics to one string
+    artist_dataset_all_verses = ' \n '.join(artist_dataset_verses_as_strings)
+
+    all_verses_vectorizer = TfidfVectorizer(vocabulary = vocab)
     # vectorizer = TfidfVectorizer(stop_words=stopwords.words('english'))
-    vectors = vectorizer.fit_transform([clean_lines(' '.join(verse)) for verse in dataset_artist])
+    all_verses_dataset_vectors = all_verses_vectorizer.fit_transform([artist_dataset_all_verses])
+
+    verse_vectorizer = TfidfVectorizer(vocabulary = vocab)
+    verse_vectors = verse_vectorizer.fit_transform(artist_dataset_verses_as_strings)
+
     avgs = []
     maxs = []
     for i in trange(len(gen_artist), desc='Verse # for Artist', leave=False):
         verse = gen_artist[i]
-        query_tfidf = vectorizer.transform([clean_lines(' '.join(verse))])
-        cosine_similarities = cosine_similarity(query_tfidf, vectors).flatten()
-        avgs.append(np.mean(cosine_similarities))
-        maxs.append(np.max(cosine_similarities))
+        cleaned_verse = [clean_lines(' '.join(verse))]
+
+        gen_to_all_verses_vector = all_verses_vectorizer.transform(cleaned_verse)
+        all_verses_sim = cosine_similarity(gen_to_all_verses_vector, all_verses_dataset_vectors).flatten()
+
+        gen_to_each_verse_vector = verse_vectorizer.transform(cleaned_verse)
+        verse_max_sim = cosine_similarity(gen_to_each_verse_vector, verse_vectors).flatten()
+
+        avgs.append(np.mean(all_verses_sim))
+        maxs.append(np.max(verse_max_sim))
     return np.mean(avgs), np.mean(maxs)
 
 def get_tfidf_scores(corpus, file_prefix):
