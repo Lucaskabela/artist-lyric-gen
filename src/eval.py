@@ -8,6 +8,9 @@ import re
 import subprocess
 import locale
 from tqdm import tqdm, trange
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 # pip install transformers
 # pip install pronouncing
@@ -87,20 +90,21 @@ def distinct_n(corpus, n=1, file_prefix=''):
 #         ppls.append(math.exp(loss))
 #     return sum(ppls) / len(ppls)
 
+def clean_lines(s):
+    # Removes extra lines, and strips lines
+    lines = [line.strip() for line in s.split('\n')]
+    lines = list(filter(lambda s: s != '', lines))
+    # reconstruct the lines together
+    cleaned_lyrics = ''
+    for line in lines:
+        # concat lines together and add the end line token back
+        cleaned_lyrics = cleaned_lyrics + line + '\n'
+    return cleaned_lyrics
+
 def calc_rhyme_density(bars):
     """
     bars: list of bpe tokens
     """
-    def clean_lines(s):
-        # Removes extra lines, and strips lines
-        lines = [line.strip() for line in s.split('\n')]
-        lines = list(filter(lambda s: s != '', lines))
-        # reconstruct the lines together
-        cleaned_lyrics = ''
-        for line in lines:
-            # concat lines together and add the end line token back
-            cleaned_lyrics = cleaned_lyrics + line + '\n'
-        return cleaned_lyrics
     text = " ".join(bars).strip()
     text = bpe_string_to_text(text)
     text = clean_lines(text)
@@ -159,13 +163,42 @@ def rhyme_density(corpus, file_prefix):
     Corpus is list[list[list[str]]], or a list of artist-verses
     Returns list of artist distinct-n and average
     """
-    print("\n===== COMPUTING RD =====\n")
     rds = []
     for artist in tqdm(corpus):
         artist_rd = sum([calc_rhyme_density(verse) for verse in tqdm(artist)]) / len(artist)
         append_stat_to_txt_file("{}_rd".format(file_prefix), artist_rd)
         rds.append(artist_rd)
     return rds, sum(rds) / len(rds)
+
+def calc_tfidf_score(gen_artist, vocab, dataset_artist):
+    vectorizer = TfidfVectorizer(vocabulary = vocab)
+    # vectorizer = TfidfVectorizer(stop_words=stopwords.words('english'))
+    vectors = vectorizer.fit_transform([clean_lines(' '.join(verse)) for verse in dataset_artist])
+    avgs = []
+    maxs = []
+    for i in trange(len(gen_artist), desc='Verse # for Artist', leave=False):
+        verse = gen_artist[i]
+        query_tfidf = vectorizer.transform([clean_lines(' '.join(verse))])
+        cosine_similarities = cosine_similarity(query_tfidf, vectors).flatten()
+        avgs.append(np.mean(cosine_similarities))
+        maxs.append(np.max(cosine_similarities))
+    return np.mean(avgs), np.mean(maxs)
+
+def get_tfidf_scores(corpus, file_prefix):
+    artist_to_verses_dataset = get_artist_to_verses_dataset('dataset/train.json')
+    with open('dataset/bpe_string_token_to_int.json') as openfile:
+        vocab = json.load(openfile).keys()
+    average_tfidf_scores = []
+    max_tfidf_scores = []
+    for i in trange(len(corpus), desc='Artist #'):
+        gen_artist = corpus[i]
+        dataset_artist = artist_to_verses_dataset[i]
+        avg_score, max_score = calc_tfidf_score(gen_artist, vocab, dataset_artist)
+        append_stat_to_txt_file("{}_avg_sim_score".format(file_prefix), avg_score)
+        append_stat_to_txt_file("{}_max_sim_score".format(file_prefix), max_score)
+        average_tfidf_scores.append(avg_score)
+        max_tfidf_scores.append(max_score)
+    return average_tfidf_scores, max_tfidf_scores
 
 def get_lyric_blocks(song, input_format):
     if input_format == "raw_song":
@@ -273,6 +306,7 @@ def main(file_prefix, read_file_name):
     distinct_1s, distinct_1_avg = distinct_n(per_artist_verses, 1, file_prefix)
     distinct_2s, distinct_2_avg = distinct_n(per_artist_verses, 2, file_prefix)
     distinct_3s, distinct_3_avg = distinct_n(per_artist_verses, 3, file_prefix)
+    avg_sim_score, max_sim_score = get_tfidf_scores(per_artist_verses, file_prefix)
     return (rd, s_bleu, distinct_1s, distinct_2s, distinct_3s)
 
 if __name__ == "__main__":
