@@ -39,6 +39,7 @@ file = open("train.json", "r")
 obj = json.load(file)
 source = []
 target = []
+longest = 0
 #for j in range(1,20):
 for item in obj:
 	psentence = content[item['artist_id'] -1]
@@ -46,9 +47,42 @@ for item in obj:
 	lyrics = [i for i in re.split("S|L", lyrics) if i != " " and i != ""]
 	for i in range(0, len(lyrics) - 1):
 		sent = noise_sentence(lyrics[i],.25)
-		source.append(psentence + ' W S' + sent + "L")
+		app = psentence + ' W S' + sent + "L"
+		source.append(app)
+		longest = max(len(app.split()), longest)
 		target.append(lyrics[i+1])
 		#print(source[0])
+trainlen = len(source)
+print("trainlen:" + str(trainlen))
+file = open("test.json", "r")
+obj = json.load(file)
+for item in obj:
+	psentence = content[item['artist_id'] -1]
+	lyrics = item['lyrics']
+	lyrics = [i for i in re.split("S|L", lyrics) if i != " " and i != ""]
+	for i in range(0, len(lyrics) - 1):
+		sent = noise_sentence(lyrics[i],.25)
+		app = psentence + ' W S' + sent + "L"
+		source.append(app)
+		longest = max(len(app.split()), longest)
+		target.append(lyrics[i+1])
+testlen = len(source) - trainlen
+print("testlen:" + str(testlen))
+file = open("val.json", "r")
+obj = json.load(file)
+for item in obj:
+	psentence = content[item['artist_id'] -1]
+	lyrics = item['lyrics']
+	lyrics = [i for i in re.split("S|L", lyrics) if i != " " and i != ""]
+	for i in range(0, len(lyrics) - 1):
+		sent = noise_sentence(lyrics[i],.25)
+		app = psentence + ' W S' + sent + "L"
+		source.append(app)
+		longest = max(len(app.split()), longest)
+		target.append(lyrics[i+1])
 lyrics_df = pd.DataFrame({"source":source, "target":target})
 lyrics_df.to_csv("lyrics_simple_noised.csv", index = False)
+evallen = len(source) - trainlen - testlen
+print("evallen:" + str(evallen))
 print(len(source))
+print(longest)
