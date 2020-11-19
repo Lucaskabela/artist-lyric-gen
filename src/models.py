@@ -42,6 +42,9 @@ class BaseNetwork(nn.Module):
             )
         )
 
+    def num_params(self):
+        total_params = sum(reduce( lambda a, b: a*b, x.size()) for x in self.parameters())
+        print("Training", total_params, "params")
 
 class GhostLSTM(BaseNetwork):
     """
