@@ -7,3 +7,6 @@
 [submodule "src/rhymeanalyzer"]
 	path = src/rhymeanalyzer
 	url = https://github.com/billyang98/rhymeanalyzer.git
+[submodule "src/artist-lyric-gen-bart"]
+	path = src/artist-lyric-gen-bart
+	url = https://github.com/billyang98/artist-lyric-gen-bart.git
