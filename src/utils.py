@@ -55,6 +55,8 @@ class Corpus(object):
         idx = 1
         with open(personas_path, 'r') as personas:
             for line in personas:
+                # Put parser here
+                # line = line[]
                 words = line.split()
                 for word in words:
                     self.dictionary.add_word(word)

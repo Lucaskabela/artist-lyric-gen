@@ -251,7 +251,7 @@ def gen(args, model=None, max_len=15, top_p=False):
                     else:
                         outputs = outputs.unsqueeze(0)
                     # Get a random sample from output
-                    word = torch.multinomial(F.softmax(outputs), 1)
+                    word = torch.multinomial(F.softmax(outputs, dim=-1), 1)
                     out_tokens.append(word.item())
                     out_sequence.append(corpus.dictionary.idx2word[word.item()])
                 ctxt.extend(out_tokens)
