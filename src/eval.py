@@ -10,7 +10,9 @@ import locale
 from tqdm import tqdm, trange
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics import mean_squared_error
 import numpy as np
+from dataset import dataset_utils
 
 # pip install transformers
 # pip install pronouncing
@@ -323,6 +325,30 @@ def main(file_prefix, read_file_name):
     avg_sim_score, max_sim_score = get_tfidf_scores(per_artist_verses, file_prefix)
     return (rd, s_bleu, distinct_1s, distinct_2s, distinct_3s)
 
+def list_to_floats(l):
+    return [float(i) for i in l]
+
+def summarize_metrics(file_prefix):
+    # RD diff
+    dataset_rds = list_to_floats(dataset_utils.read_list_from_file('train_dataset_rd.txt'))
+    model_rds = list_to_floats(dataset_utils.read_list_from_file('{}_rd.txt'.format(file_prefix)))
+    rd_diff = mean_squared_error(dataset_rds, model_rds)
+    s_bleu = list_to_floats(dataset_utils.read_list_from_file('{}_sbleu.txt'.format(file_prefix)))
+    d1 = list_to_floats(ataset_utils.read_list_from_file('{}_d1.txt'.format(file_prefix)))
+    d2 = list_to_floats(dataset_utils.read_list_from_file('{}_d2.txt'.format(file_prefix)))
+    d3 = list_to_floats(dataset_utils.read_list_from_file('{}_d3.txt'.format(file_prefix)))
+    avg_sim = list_to_floats(dataset_utils.read_list_from_file('{}_avg_sim_score.txt'.format(file_prefix)))
+    max_sim = list_to_floats(dataset_utils.read_list_from_file('{}_max_sim_score.txt'.format(file_prefix)))
+    with open("{}_metrics_summary.txt".format(file_prefix), 'w') as openfile:
+        openfile.write("RD Difference: {}\n".format(str(rd_diff)))
+        openfile.write("Self BLEU: {}\n".format(str(np.mean(s_bleu))))
+        openfile.write("Distinct 1: {}\n".format(str(np.mean(d1))))
+        openfile.write("Distinct 2: {}\n".format(str(np.mean(d2))))
+        openfile.write("Distinct 3: {}\n".format(str(np.mean(d3))))
+        openfile.write("Avg Similarity: {}\n".format(str(np.mean(avg_sim))))
+        openfile.write("Max Similarity: {}\n".format(str(np.mean(max_sim))))
+
+
 if __name__ == "__main__":
     # ****REMEMBER: change the file name if necessary
-    main('train_dataset', 'dataset/train.json')
+    # main('train_dataset', 'dataset/train.json')
