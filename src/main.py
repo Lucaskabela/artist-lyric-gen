@@ -5,7 +5,7 @@ PURPOSE: This file defines the driving functions for the expirements/code
         of the project and contains the argparser
 """
 import argparse
-from train import train, perplexity
+from train import train, vae_train, perplexity
 import models
 import torch
 
@@ -65,7 +65,7 @@ def _parse_args():
 
 def main():
     args = _parse_args()
-    model = train(args)
+    model = vae_train(args)
     if args.eval:
         with torch.no_grad():
             perplexity(args)
