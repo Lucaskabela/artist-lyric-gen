@@ -49,31 +49,6 @@ class BaseNetwork(nn.Module):
                 pytorch_total_params += p.numel()
         print(pytorch_total_params)
 
-class GhostLSTM(BaseNetwork):
-    """
-    Defines the LSTM model based onGhostWriter Potash et al. 2015
-    """
-
-    def __init__(self, vocab_size, embedding_dim, hidden_size, name="ghost"):
-
-        super().__init__()
-        self.vocab_size = vocab_size
-        self.name = name
-        self.embedding = nn.Embedding(self.vocab_size, embedding_dim)
-        nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
-        # TODO: add args for
-        self.encoder = nn.LSTM(embedding_dim, hidden_size)
-        self.decoder = nn.LSTM(hidden_size, self.vocab_size)
-
-    def forward(self, context):
-        """
-        Given a padded batch of input, with dimension [batch x seq_len],
-        embeds & then passed through the network, producing [batch x out_len]
-        where the output length is padded with <PAD>
-        """
-        pass
-
-
 class CVAE(BaseNetwork):
     """
     Defines the CVAE approach, using LSTMs as Encoder/Decoder
@@ -309,7 +284,7 @@ class CVAE(BaseNetwork):
 
 class VAE(BaseNetwork):
     """
-    Defines the VAE approach, using LSTMs as Encoder/Decoder
+    Defines the CVAE without persona approach, using RNNs as Encoder/Decoder
     """
 
     def __init__(
@@ -319,6 +294,7 @@ class VAE(BaseNetwork):
         hidden_size,
         latent_dim,
         drop=0.1,
+        rnn="lstm",
         name="vae",
     ):
         super(VAE, self).__init__()
@@ -327,41 +303,31 @@ class VAE(BaseNetwork):
         self.hidden_size = hidden_size
         self.latent_dim = latent_dim
         self.name = name
+        self.rnn = rnn
 
         self.embedding = nn.Embedding(self.vocab_size, emb_dim)
         nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
-
-        # Create the dropout layers
-        self.emb_dropout = nn.Dropout(p=drop)
-        self.latent_dropout = nn.Dropout(p=drop)
-        self.hidden_dropout = nn.Dropout(p=drop)
-
-        # Layer Norms for stability
+        self.dropout = nn.Dropout(p=drop)
         self.recoglnorm = nn.LayerNorm(hidden_size * 2)
-        self.priorlnorm = nn.LayerNorm(hidden_size * 2)
-
-        # Because F.... is depricated
-        self.tanh = torch.tanh
 
         # X and P will be encoded then concatenated
-        self.x_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
-        self.y_encoder = nn.LSTM(
-            emb_dim, hidden_size, bidirectional=True, batch_first=True
-        )    
- 
-        self.recognition = nn.Linear(hidden_size * 4, hidden_size * 2)
+        if rnn == "lstm":
+            self.x_encoder = nn.LSTM(emb_dim, hidden_size, bidirectional=True, batch_first=True)
+        elif rnn == "gru":
+            self.x_encoder = nn.GRU(emb_dim, hidden_size, bidirectional=True, batch_first=True)
+
+        self.recognition = nn.Linear(hidden_size * 2, hidden_size * 2)
         self.r_mu_log_var = nn.Linear(hidden_size * 2, latent_dim * 2)
 
-        self.prior = nn.Linear(hidden_size * 2, hidden_size * 2)
-        self.p_mu_log_var = nn.Linear(hidden_size * 2, latent_dim * 2)
-
         # Make this latent + hidden (?)
-        self.latent2hidden = nn.Linear(latent_dim + hidden_size * 2, hidden_size)
-        self.bow1 = nn.Linear(latent_dim + hidden_size * 2, hidden_size)
-        self.bow2 = nn.Linear(hidden_size, self.vocab_size)
+        self.latent2hidden = nn.Linear(latent_dim, hidden_size)
 
-        self.decoder = nn.LSTM(emb_dim,  hidden_size, batch_first=True)
-
+        if rnn == "lstm":
+            self.decoder = nn.LSTM(emb_dim,  hidden_size, batch_first=True)
+        elif rnn == "gru":
+            self.decoder = nn.GRU(emb_dim,  hidden_size, batch_first=True)
+        else:
+            raise Exception("RNN type {} is not supported".format(rnn))
         self.out = nn.Linear( hidden_size, self.vocab_size)
         self.log_softmax = nn.LogSoftmax(dim=-1)
 

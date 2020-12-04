@@ -7,14 +7,16 @@ PURPOSE: This file defines the code for training the neural networks in pytorch
 from os import path
 import models
 import utils
+import json
 import numpy as np
 import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.tensorboard as tb
-
-
+import matplotlib.pyplot as plt
+import matplotlib.cm as cmx
+import matplotlib.colors as colors
 
 def gaussian_kld(recog_mu, recog_logvar, prior_mu, prior_logvar):
     kld = -0.5 * (1 + (recog_logvar - prior_logvar)
@@ -124,6 +126,116 @@ def eval_inference(model, corpus, valid, valid_log, global_step):
     model.train()
     return avg_loss/num_examples
 
+def twod_viz(args, model=None):
+    device = init_device()
+    corpus = utils.Corpus(args.data, args.persona_data)
+    if model is None:
+        vocab = len(corpus.dictionary)
+        model = models.CVAE(vocab, args.embedding, args.hidden, args.latent, rnn=args.rnn)
+        model.load_model()
+        model = model.to(device)
+    model.eval()
+    # colors = ['red', 'green', 'cyan', 'blue', 'purple', 'yellow', 'black', 'orange', 'indigo', 'grey']
+    artist_names = ["21 savage", '6ix9ine', 'dr dre', 'earl sweatshirt', 'ice cube', 'kayne west', 'kendrick lamar', 'kid cudi', 'pusha t', 'tyler the creator',]
+    artist_list = [2, 5, 23, 26, 36, 44, 46, 47, 67, 86]
+    names = {}
+    for name, id_ in zip(artist_names, artist_list):
+      names[id_] = name
+    latents = []
+    labels = []
+    for artist in artist_list:
+        curr = []
+        persona = corpus.personas[artist]
+        print("Artist {}".format(artist))        
+        ctxt = ['S', 'the', 'greatest', 'rapper', 'of', 'all', 'time']
+        ctxt = [corpus.dictionary.word2idx[word] for word in ctxt]
+        p_len = torch.tensor([len(persona)]).long().to(device)
+        p = torch.tensor([persona]).long().to(device)
+        x_len = torch.tensor([len(ctxt)]).long().to(device)
+        x = torch.tensor([ctxt]).long().to(device)
+        x_emb = model.embedding(x)
+        p_emb = model.embedding(p)
+
+        c_enc = model.contextualize(x_emb, x_len, p_emb, p_len)
+        out_prior = model.priorlnorm(model.tanh(model.prior(c_enc)))
+        p = model.p_mu_log_var(out_prior)
+        p_mu, p_log_var = torch.split(p, model.latent_dim, dim=-1)
+        # latents.append(p_mu.cpu().numpy().squeeze())
+        # labels.append(artist)
+        for i in range(3):
+            # Get 10 samples of latent space
+            z = model.reparameterize(p_mu, p_log_var)
+            z = z.cpu().numpy().squeeze()
+            curr.append(z)
+            labels.append(artist)
+        latents.append(np.stack(curr))
+    latents = np.concatenate(latents)
+    print(latents.shape)
+    labels = np.array(labels)
+    print(labels.shape)
+    # cm = plt.get_cmap('gist_rainbow')
+    fig = plt.figure()
+    jet = cm = plt.get_cmap('gist_rainbow') 
+    cNorm  = colors.Normalize(vmin=0, vmax=10)
+    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=jet)
+    for idx, cl in enumerate(np.unique(labels)):
+        plt.scatter(x=latent_pca[labels == cl, 0], 
+                    y=latent_pca[labels == cl, 1],
+                    alpha=0.6,
+                    color=scalarMap.to_rgba(idx), 
+                    edgecolor='black',
+                    label=names[cl])
+    plt.xlabel('PC 1')
+    plt.ylabel('PC 2')
+    plt.legend(bbox_to_anchor=(1.25, 1.05), loc='upper right')
+    plt.show()
+    fig.savefig('my_figure.png')
+
+def gen(args, model=None, max_len=20):
+    device = init_device()
+    corpus = utils.Corpus(args.data, args.persona_data)
+    if model is None:
+        vocab = len(corpus.dictionary)
+        model = models.CVAE(vocab, args.embedding, args.hidden, args.latent)
+        model.load_model()
+        model = model.to(device)
+    model.eval()
+
+    generated_verses = {}
+    for persona in corpus.personas:
+        print("Artist {}".format(persona))
+        persona_tokens = corpus.personas[persona]
+        p_len = torch.tensor([len(persona_tokens)]).long().to(device)
+        p = torch.tensor([persona_tokens]).long().to(device)
+        # 50 verses per artist, arbitrary
+        artist_verses = []
+        for _ in range(50):
+            generated_verse = []
+            ctxt = [1]
+            # 16 bars per verse
+            for _ in range(16):
+                out_sequence = ["S"]
+                out_tokens = []
+                x_len = torch.tensor([len(ctxt)]).long().to(device)
+                x = torch.tensor([ctxt]).long().to(device)
+                hidden = model.infer_hidden(x, x_len, p, p_len)
+                word = torch.ones([1, 1], dtype=torch.long, device=model.device())
+                while out_sequence[-1] != "L" and len(out_sequence) < max_len:
+                    word = model.embedding(word)
+                    outputs, hidden = model.decoder(word, hidden)
+                    outputs = F.log_softmax(model.out(outputs), dim=-1)
+                    # Get a random sample from output
+                    word = torch.multinomial(outputs, 1)
+                    out_tokens.append(word.item())
+                    out_sequence.append(corpus.dictionary.idx2word[word.item()])
+                ctxt.extend(out_tokens)
+                generated_verse.extend(out_sequence)
+            artist_verses.append(generated_verse)
+        generated_verses[persona] = artist_verses
+    with open("verses.json", 'w') as verses_file:
+      json.dump(generated_verses, verses_file)
+
+      
 # Computes the perplexity on the validation (hold out) set
 def perplexity(args, model=None):
     device = init_device()
