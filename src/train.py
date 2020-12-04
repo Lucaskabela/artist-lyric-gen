@@ -24,13 +24,6 @@ def gaussian_kld(recog_mu, recog_logvar, prior_mu, prior_logvar):
                                - torch.div(torch.exp(recog_logvar), torch.exp(prior_logvar)))
     return kld
 
-def gaussian_01kld(mu, log_var):
-        return -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
-
-def vae_loss_function(x_p, x, mu, log_var, alpha=0):
-    BCE = F.nll_loss(x_p, x, reduction="mean", ignore_index=0)
-    KLD = gaussian_01kld(mu, log_var)
-    return BCE + alpha * KLD
     
 def cvae_loss_function(x_p, x, bow_log, r_mu, r_log_var, p_mu, p_log_var, alpha=0):
     """
@@ -68,7 +61,7 @@ def init_logger(log_dir=None):
 
 # TODO: Fix eval_inference
 def eval_inference(model, corpus, valid, valid_log, global_step):
-    max_len = 30
+    max_len = 15
     # Change to sample context from test and use this to generate / condition
     device = model.device()
     model.eval()
@@ -135,7 +128,6 @@ def twod_viz(args, model=None):
         model.load_model()
         model = model.to(device)
     model.eval()
-    # colors = ['red', 'green', 'cyan', 'blue', 'purple', 'yellow', 'black', 'orange', 'indigo', 'grey']
     artist_names = ["21 savage", '6ix9ine', 'dr dre', 'earl sweatshirt', 'ice cube', 'kayne west', 'kendrick lamar', 'kid cudi', 'pusha t', 'tyler the creator',]
     artist_list = [2, 5, 23, 26, 36, 44, 46, 47, 67, 86]
     names = {}
@@ -147,7 +139,7 @@ def twod_viz(args, model=None):
         curr = []
         persona = corpus.personas[artist]
         print("Artist {}".format(artist))        
-        ctxt = ['S', 'the', 'greatest', 'rapper', 'of', 'all', 'time']
+        ctxt = ['S']
         ctxt = [corpus.dictionary.word2idx[word] for word in ctxt]
         p_len = torch.tensor([len(persona)]).long().to(device)
         p = torch.tensor([persona]).long().to(device)

@@ -65,7 +65,7 @@ def _parse_args():
 
 def main():
     args = _parse_args()
-    model = vae_train(args)
+    model = cvae_train(args)
     if args.eval:
         with torch.no_grad():
             perplexity(args)
