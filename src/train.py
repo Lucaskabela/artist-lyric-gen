@@ -14,7 +14,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.tensorboard as tb
-from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import matplotlib.cm as cmx
 import matplotlib.colors as colors
@@ -170,8 +169,6 @@ def twod_viz(args, model=None):
     print(latents.shape)
     labels = np.array(labels)
     print(labels.shape)
-    pca = PCA(n_components=2)
-    latent_pca = pca.fit_transform(latents)
     # cm = plt.get_cmap('gist_rainbow')
     fig = plt.figure()
     jet = cm = plt.get_cmap('gist_rainbow') 
