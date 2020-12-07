@@ -128,7 +128,7 @@ def twod_viz(args, model=None):
         model.load_model()
         model = model.to(device)
     model.eval()
-    artist_names = ["21 savage", '6ix9ine', 'dr dre', 'earl sweatshirt', 'ice cube', 'kayne west', 'kendrick lamar', 'kid cudi', 'pusha t', 'tyler the creator',]
+    artist_names = ["21 savage", '6ix9ine', 'dr dre', 'earl sweatshirt', 'ice cube', 'kanye west', 'kendrick lamar', 'kid cudi', 'pusha t', 'tyler the creator',]
     artist_list = [2, 5, 23, 26, 36, 44, 46, 47, 67, 86]
     names = {}
     for name, id_ in zip(artist_names, artist_list):
@@ -152,34 +152,36 @@ def twod_viz(args, model=None):
         out_prior = model.priorlnorm(model.tanh(model.prior(c_enc)))
         p = model.p_mu_log_var(out_prior)
         p_mu, p_log_var = torch.split(p, model.latent_dim, dim=-1)
-        # latents.append(p_mu.cpu().numpy().squeeze())
-        # labels.append(artist)
-        for i in range(3):
-            # Get 10 samples of latent space
-            z = model.reparameterize(p_mu, p_log_var)
-            z = z.cpu().numpy().squeeze()
-            curr.append(z)
-            labels.append(artist)
-        latents.append(np.stack(curr))
-    latents = np.concatenate(latents)
+        latents.append(p_mu.cpu().numpy().squeeze())
+        labels.append(artist)
+    latents = np.stack(latents)
+    means = np.mean(latents, axis=0)
+    print(means)
+    latents = latents - means
+    print(latents)
     print(latents.shape)
     labels = np.array(labels)
     print(labels.shape)
     # cm = plt.get_cmap('gist_rainbow')
     fig = plt.figure()
-    jet = cm = plt.get_cmap('gist_rainbow')
-    cNorm  = colors.Normalize(vmin=0, vmax=10)
-    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=jet)
+    # jet = cm = plt.get_cmap('gist_rainbow')
+    # cNorm  = colors.Normalize(vmin=0, vmax=10)
+    # scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=jet)
     for idx, cl in enumerate(np.unique(labels)):
-        plt.scatter(x=latent_pca[labels == cl, 0],
-                    y=latent_pca[labels == cl, 1],
-                    alpha=0.6,
-                    color=scalarMap.to_rgba(idx),
-                    edgecolor='black',
-                    label=names[cl])
-    plt.xlabel('PC 1')
-    plt.ylabel('PC 2')
-    plt.legend(bbox_to_anchor=(1.25, 1.05), loc='upper right')
+        plt.scatter(x=latents[idx, 0]*1000,
+                    y=latents[idx, 1]*1000,
+                    label=artist_names[idx])
+        # plt.text(x=latents[idx, 0]*1000,
+        #             y=latents[idx, 1]*1000,
+        #             s=artist_names[idx],
+        #             alpha=0.9,
+        #             )
+    plt.legend(loc='upper left')
+    plt.xlim(-2.75, 2.75)
+    plt.ylim(-2.75, 2.75)
+    plt.xlabel("Dim 1")
+    plt.ylabel("Dim 2")
+    plt.title("Artist Embeddings with IDs")
     plt.show()
     fig.savefig('my_figure.png')
 
