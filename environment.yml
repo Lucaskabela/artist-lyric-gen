@@ -12,5 +12,5 @@ dependencies:
   - pytest=5.3.5
   - tensorboard=2.2.1
   - tqdm=4.42.1
-  - tqdm=4.30.0
   - langdetect
+  - tqdm=4.42.1
