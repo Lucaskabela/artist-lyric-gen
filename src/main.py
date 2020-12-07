@@ -5,13 +5,9 @@ PURPOSE: This file defines the driving functions for the expirements/code
         of the project and contains the argparser
 """
 import argparse
-<<<<<<< HEAD
-from train import train
-=======
 from train import train, vae_train, perplexity
 import models
 import torch
->>>>>>> cvae-personas-lucas
 
 
 def _parse_args():
@@ -38,10 +34,7 @@ def _parse_args():
     parser = argparse.ArgumentParser(
         description="Arguments for Lyric Generation project",
     )
-<<<<<<< HEAD
-=======
     parser.add_argument("--eval", action="store_true", help="Generate and run eval on a trained model")
->>>>>>> cvae-personas-lucas
     # Model related arguments here
     # Hyperparameters are default from Song et al. 2019
     # Persona information for...
@@ -49,22 +42,15 @@ def _parse_args():
     parser.add_argument("-hd", "--hidden", type=int, default=500)
     parser.add_argument("-l", "--latent", type=int, default=100)
     parser.add_argument("-d", "--dropout", type=float, default=0.1)
-<<<<<<< HEAD
-=======
     parser.add_argument('--rnn', type=str, default='lstm')
->>>>>>> cvae-personas-lucas
 
     # Training related arguments here
     parser.add_argument("--rand_seed", type=int, default=1)
     parser.add_argument(
-<<<<<<< HEAD
-        "--data", type=str, default="./data/wikitext2", help="Dir of dataset"
-=======
         "--data", type=str, default="./dataset/", help="Dir of dataset"
     )
     parser.add_argument(
         "--persona_data", type=str, default="./dataset/persona_tags_bpe.txt", help="Dir of dataset"
->>>>>>> cvae-personas-lucas
     )
     parser.add_argument("--log_dir", type=str, default=None, help="Dir of tb")
     parser.add_argument("-n", "--num_epoch", type=int, default=50)
