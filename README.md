@@ -32,6 +32,7 @@ We forked Sennrich's BPE implementation
 ## Training
 
 For CVAE, we have a [training notebook](https://github.com/Lucaskabela/artist-lyric-gen/blob/master/src/notebooks/cvae_train.ipynb) which demonstrates the commands needed to train the model and generate verses
+
 For BART, we have a training repo [artist-lyric-gen-bart](https://github.com/billyang98/artist-lyric-gen-bart)
 
 
