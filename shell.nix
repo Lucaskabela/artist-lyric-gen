@@ -17,7 +17,7 @@ let
     pytest
     tqdm
     transformers
-    pytorch
+    pytorchWithCuda
   ] );
 
 in pkgs.mkShell {
